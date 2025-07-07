@@ -1,0 +1,3320 @@
+<!DOCTYPE html>
+<html lang="de" class="dark"> <!-- Standardmäßig im Dark-Mode, wird per JS angepasst -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n-key="pageTitle">My Expenses - Extended Insight</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // Tailwind dark mode configuration
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .summary-card {
+            transition: all 0.3s ease;
+        }
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        /* Custom scrollbar for dark and light mode */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b; /* slate-800 */
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569; /* slate-600 */
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+
+        .toggle-label, .expand-row, .sortable-header, .transaction-sortable-header {
+            cursor: pointer;
+        }
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        .expand-icon {
+            transition: transform 0.2s ease-in-out;
+        }
+        .expand-row.expanded .expand-icon {
+            transform: rotate(90deg);
+        }
+        .sort-icon {
+            display: inline-block;
+            width: 1em;
+            text-align: center;
+            color: #9ca3af;
+        }
+        .sortable-header.asc .sort-icon::after, .transaction-sortable-header.asc .sort-icon::after { content: '▲'; }
+        .sortable-header.desc .sort-icon::after, .transaction-sortable-header.desc .sort-icon::after { content: '▼'; }
+        tr.dragging {
+            opacity: 0.5;
+            background: #312e81; /* indigo-900 */
+        }
+        tr.drag-over-border {
+            border-top: 2px solid #4f46e5;
+        }
+        #loading-overlay {
+            z-index: 100;
+        }
+        .view-btn.active, .comparison-view-btn.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .dark .view-btn.active, .dark .comparison-view-btn.active {
+            background-color: #6366f1;
+        }
+        #rates-availability-graph .bar-track {
+            display: flex;
+            width: 100%;
+            height: 12px;
+            background-color: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            transition: background-color 0.3s;
+        }
+        .dark #rates-availability-graph .bar-track {
+             background-color: #374151; /* gray-700 */
+        }
+        #rates-availability-graph.missing-needed .bar-track {
+            background-color: #fee2e2; /* red-100 */
+        }
+        .dark #rates-availability-graph.missing-needed .bar-track {
+            background-color: #7f1d1d; /* red-900 */
+        }
+        #rates-availability-graph .bar-segment {
+            height: 100%;
+        }
+        #rates-availability-graph .year-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2px;
+        }
+        #rates-availability-graph .year-marker {
+            font-size: 10px;
+            color: #6b7280;
+        }
+        .dark #rates-availability-graph .year-marker {
+            color: #9ca3af;
+        }
+        /* Alerts */
+        .alert { display: flex; align-items: start; padding: 1rem; border-radius: 0.75rem; border-width: 1px; border-style: solid; }
+        .alert-warning { background-color: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .dark .alert-warning { background-color: #422006; border-color: #78350f; color: #fef3c7; }
+        .alert-info { background-color: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+        .dark .alert-info { background-color: #1e293b; border-color: #3b82f6; color: #dbeafe; }
+        .alert-icon { flex-shrink: 0; margin-top: 2px; height: 1.25rem; width: 1.25rem; }
+        .alert-content { margin-left: 0.75rem; flex-grow: 1; font-size: 0.875rem; line-height: 1.25rem; }
+        .alert-content a { font-weight: 600; text-decoration: underline; cursor: pointer; }
+        .alert-close-btn { flex-shrink: 0; margin-left: 1rem; padding: 0.25rem; border-radius: 9999px; background-color: transparent; border: none; cursor: pointer; color: inherit; opacity: 0.7; }
+        .alert-close-btn:hover { opacity: 1; background-color: rgba(0,0,0,0.05); }
+        .dark .alert-close-btn:hover { background-color: rgba(255,255,255,0.1); }
+        /* Custom Checkbox for Year Selector */
+        .year-checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            transition: all 0.2s ease-in-out;
+        }
+        .dark .year-checkbox-label {
+            border-color: #4b5563; /* gray-600 */
+        }
+        .year-checkbox-label:hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .dark .year-checkbox-label:hover {
+            background-color: #374151; /* gray-700 */
+        }
+        .year-checkbox:checked + .year-checkbox-label {
+            background-color: #4f46e5; /* indigo-600 */
+            border-color: #4f46e5;
+            color: white;
+        }
+        .dark .year-checkbox:checked + .year-checkbox-label {
+            background-color: #6366f1; /* indigo-500 */
+            border-color: #6366f1;
+        }
+        .year-checkbox {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-300">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="fixed inset-0 bg-white/75 dark:bg-slate-900/75 backdrop-blur-sm flex-col items-center justify-center hidden">
+            <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p id="loading-message" class="mt-4 text-slate-600 dark:text-slate-400" data-i18n-key="loadingMessage">Lade Daten...</p>
+        </div>
+
+        <!-- Header -->
+        <header class="mb-8 flex justify-between items-start gap-4">
+            <div>
+                <h1 class="text-4xl font-bold text-slate-900 dark:text-white" data-i18n-key="dashboardTitle">My Expenses - Extended Insight</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-1" data-i18n-key="dashboardSubtitle">Laden Sie Ihre CSV-Datei hoch, um eine detaillierte Analyse zu erhalten.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Language Switcher -->
+                <select id="lang-switcher" class="block pl-3 pr-8 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                    <option value="de">Deutsch</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                </select>
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-slate-900">
+                    <svg id="theme-icon-light" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    <svg id="theme-icon-dark" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Alert Container -->
+        <div id="alert-container" class="mb-6 space-y-3"></div>
+
+        <!-- Upload Section -->
+        <div id="upload-section" class="space-y-8">
+            <!-- Step 1: Optional Rates Upload -->
+            <div class="text-center py-10 px-6 bg-white dark:bg-slate-800 rounded-2xl shadow-md">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white" data-i18n-key="uploadRatesTitle">Schritt 1 (Optional): Wechselkurse laden</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" data-i18n-key="uploadRatesSubtitle">Laden Sie eine vorhandene `exchange_rates.json`-Datei, um API-Anfragen zu sparen.</p>
+                <div class="mt-4">
+                    <input type="file" id="rates-json-input" class="sr-only" accept=".json,.gz">
+                    <label for="rates-json-input" class="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600" data-i18n-key="selectJsonFile">
+                        JSON-Datei auswählen
+                    </label>
+                </div>
+                <p id="rates-upload-success" class="text-green-600 dark:text-green-400 text-sm mt-3 hidden" data-i18n-key="ratesUploadSuccess">✓ Wechselkurse erfolgreich geladen.</p>
+            </div>
+
+            <!-- Step 2: Transaction Upload -->
+            <div class="text-center py-10 px-6 bg-white dark:bg-slate-800 rounded-2xl shadow-md border-2 border-dashed border-slate-200 dark:border-slate-700">
+                <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                </svg>
+                <h3 class="mt-2 text-lg font-semibold text-slate-900 dark:text-white" data-i18n-key="uploadCsvTitle">Schritt 2: Transaktionen hochladen</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" data-i18n-key="uploadCsvSubtitle">Ziehen Sie Ihre CSV-Datei hierher oder klicken Sie zum Auswählen.</p>
+                <div class="mt-6">
+                    <input type="file" id="csv-file-input" class="sr-only" accept=".csv">
+                    <label for="csv-file-input" class="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-i18n-key="selectCsvFile">
+                        CSV-Datei auswählen
+                    </label>
+                </div>
+            </div>
+            <p id="upload-error" class="text-red-500 dark:text-red-400 text-sm mt-4 hidden text-center"></p>
+        </div>
+
+        <!-- Dashboard Section (hidden by default) -->
+        <main id="dashboard-section" class="hidden">
+            <!-- View Switcher & Global Controls -->
+            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div class="inline-flex rounded-md shadow-sm" role="group">
+                    <button type="button" data-view="dashboard" class="view-btn active py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 rounded-l-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 focus:z-10 focus:ring-2 focus:ring-indigo-500" data-i18n-key="viewDashboard">
+                        Dashboard
+                    </button>
+                    <button type="button" data-view="timeline" class="view-btn py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 border-t border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 focus:z-10 focus:ring-2 focus:ring-indigo-500" data-i18n-key="viewTimeline">
+                        Zeitverlauf
+                    </button>
+                    <button type="button" data-view="comparison" class="view-btn py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 border-t border-b border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 focus:z-10 focus:ring-2 focus:ring-indigo-500" data-i18n-key="viewComparison">
+                        Vergleich
+                    </button>
+                    <button type="button" data-view="transactions" class="view-btn py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 rounded-r-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 focus:z-10 focus:ring-2 focus:ring-indigo-500" data-i18n-key="viewTransactions">
+                        Transaktionen
+                    </button>
+                </div>
+                 <div>
+                    <label for="currency-select" class="sr-only" data-i18n-key="currencyLabel">Währung</label>
+                    <select id="currency-select" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                        <option value="EUR_CONVERTED" data-i18n-key="currencyEurConverted">EUR (umgerechnet)</option>
+                        <option value="JPY_CONVERTED" data-i18n-key="currencyJpyConverted">JPY (umgerechnet)</option>
+                        <option value="EUR" data-i18n-key="currencyEurOnly">Nur EUR</option>
+                        <option value="JPY" data-i18n-key="currencyJpyOnly">Nur JPY</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- View: Dashboard -->
+            <div id="dashboard-view" class="view-container">
+                <!-- Filter Controls -->
+                <div class="flex flex-wrap gap-x-6 gap-y-4 mb-8 bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm items-end">
+                    <div>
+                        <label for="year-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300" data-i18n-key="yearLabel">Jahr</label>
+                        <select id="year-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
+                    </div>
+                    <div>
+                        <label for="month-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300" data-i18n-key="monthLabel">Monat</label>
+                        <select id="month-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
+                    </div>
+                    <div class="flex items-center pb-2">
+                        <input type="checkbox" id="toggle-subcategories" class="h-4 w-4 text-indigo-600 border-slate-300 dark:border-slate-600 rounded focus:ring-indigo-500" checked>
+                        <label for="toggle-subcategories" class="ml-2 block text-sm text-slate-900 dark:text-slate-300 toggle-label" data-i18n-key="showSubcategories">Unterkategorien anzeigen</label>
+                    </div>
+                    <div>
+                         <button class="category-filter-btn px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-i18n-key="filterCategories">
+                            Kategorien filtern
+                        </button>
+                    </div>
+                    <div class="ml-auto flex items-end gap-4">
+                        <div id="rates-info-container" class="hidden">
+                            <p id="rates-loaded-info" class="text-sm mb-1 text-right"></p>
+                            <div id="rates-availability-graph" class="w-64"></div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button id="download-rates-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-green-300 dark:disabled:bg-green-800 disabled:cursor-not-allowed" data-i18n-key="saveRates" disabled>
+                                Kurse speichern
+                            </button>
+                            <button id="reset-button" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 dark:text-indigo-200 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-i18n-key="uploadNewFile">
+                                Neue Datei hochladen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="summary-card bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
+                            <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 dark:text-slate-400" data-i18n-key="income">Einnahmen</p>
+                            <p id="total-income" class="text-2xl font-bold text-green-600 dark:text-green-400">0,00 €</p>
+                        </div>
+                    </div>
+                    <div class="summary-card bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-red-100 dark:bg-red-900/50">
+                            <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 dark:text-slate-400" data-i18n-key="expenses">Ausgaben</p>
+                            <p id="total-expenses" class="text-2xl font-bold text-red-600 dark:text-red-400">0,00 €</p>
+                        </div>
+                    </div>
+                    <div class="summary-card bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md flex items-center space-x-4">
+                        <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                             <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 dark:text-slate-400" data-i18n-key="netResult">Nettoergebnis</p>
+                            <p id="net-savings" class="text-2xl font-bold text-slate-800 dark:text-slate-200">0,00 €</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                    <div class="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4" data-i18n-key="expensesByCategory">Ausgaben nach Kategorie</h2>
+                        <div class="h-96" id="chart-container">
+                             <canvas id="expense-chart"></canvas>
+                        </div>
+                        <div id="no-chart-data" class="hidden h-96 flex items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                            <p data-i18n-key="noExpenseData">Keine Ausgabendaten für diesen Zeitraum vorhanden.</p>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4" data-i18n-key="transactions">Transaktionen</h2>
+                        <div id="transaction-list" class="transaction-list custom-scrollbar space-y-3 overflow-y-auto max-h-96 pr-2">
+                            <!-- Transaction items will be injected here -->
+                        </div>
+                         <div id="no-transactions" class="hidden h-96 flex items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                            <p data-i18n-key="noTransactions">Keine Transaktionen für diesen Zeitraum vorhanden.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Category Breakdown Table -->
+                    <div class="lg:col-span-5 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4" data-i18n-key="detailedCategoryView">Detaillierte Kategorienübersicht</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                                <thead class="text-xs text-slate-700 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-700">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 sortable-header" data-sort-key="category" data-i18n-key="category">Kategorie <span class="sort-icon"></span></th>
+                                        <th scope="col" class="px-6 py-3 text-right sortable-header" data-sort-key="income" data-i18n-key="income">Einnahmen <span class="sort-icon"></span></th>
+                                        <th scope="col" class="px-6 py-3 text-right sortable-header" data-sort-key="expense" data-i18n-key="expenses">Ausgaben <span class="sort-icon"></span></th>
+                                        <th scope="col" class="px-6 py-3 text-right sortable-header" data-sort-key="net" data-i18n-key="net">Netto <span class="sort-icon"></span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailed-category-tbody">
+                                    <!-- Table rows will be injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Timeline -->
+            <div id="timeline-view" class="view-container hidden space-y-8">
+                 <div class="lg:col-span-5 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white" data-i18n-key="timelineByCategory">Zeitverlauf nach Kategorien (gefiltert)</h2>
+                        <div class="flex items-center gap-4">
+                            <button id="timeline-select-all-btn" class="px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 dark:text-indigo-200 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900" data-i18n-key="selectAll">Alle auswählen</button>
+                            <button id="timeline-deselect-all-btn" class="ml-2 px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600" data-i18n-key="deselectAll">Alle abwählen</button>
+                            <select id="timeline-chart-type-select" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="periodic" data-i18n-key="periodic">Periodisch</option>
+                                <option value="cumulative" data-i18n-key="cumulative">Kumulativ</option>
+                            </select>
+                            <select id="timeframe-select" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="1m" data-i18n-key="timeframe1m">1 Monat</option>
+                                <option value="6m" data-i18n-key="timeframe6m">6 Monate</option>
+                                <option value="1y" selected data-i18n-key="timeframe1y">1 Jahr</option>
+                                <option value="2y" data-i18n-key="timeframe2y">2 Jahre</option>
+                                <option value="3y" data-i18n-key="timeframe3y">3 Jahre</option>
+                                <option value="5y" data-i18n-key="timeframe5y">5 Jahre</option>
+                                <option value="10y" data-i18n-key="timeframe10y">10 Jahre</option>
+                                <option value="max" data-i18n-key="timeframeMax">Max</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="h-[28rem]" id="timeline-chart-container">
+                        <canvas id="timeline-chart"></canvas>
+                    </div>
+                </div>
+                <!-- New Chart for Total Net -->
+                <div class="lg:col-span-5 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4" data-i18n-key="totalNetTimeline">Gesamtverlauf Nettoergebnis (ungefiltert)</h2>
+                    <div class="h-[20rem]" id="total-timeline-chart-container">
+                        <canvas id="total-timeline-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- View: Comparison -->
+            <div id="comparison-view" class="view-container hidden space-y-8">
+                 <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white" data-i18n-key="comparisonTitle">Jahresvergleich</h2>
+                        <div class="flex items-center gap-4">
+                             <div class="inline-flex rounded-md shadow-sm" role="group">
+                                <button type="button" id="comparison-view-bar-btn" class="comparison-view-btn active py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 rounded-l-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n-key="barChart">
+                                    Balkendiagramm
+                                </button>
+                                <button type="button" id="comparison-view-pie-btn" class="comparison-view-btn py-2 px-4 text-sm font-medium text-slate-900 dark:text-slate-300 bg-white dark:bg-slate-800 rounded-r-lg border-t border-b border-r border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700" data-i18n-key="pieCharts">
+                                    Kreisdiagramme
+                                </button>
+                            </div>
+                            <button class="category-filter-btn px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-i18n-key="filterCategories">
+                                Kategorien filtern
+                            </button>
+                            <select id="comparison-data-type-select" class="block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="net" data-i18n-key="net">Netto</option>
+                                <option value="income" data-i18n-key="income">Einnahmen</option>
+                                <option value="expenses" data-i18n-key="expenses">Ausgaben</option>
+                            </select>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="comparison-toggle-subcategories" class="h-4 w-4 text-indigo-600 border-slate-300 dark:border-slate-600 rounded focus:ring-indigo-500" checked>
+                                <label for="comparison-toggle-subcategories" class="ml-2 block text-sm text-slate-900 dark:text-slate-300 toggle-label" data-i18n-key="showSubcategories">Unterkategorien anzeigen</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2" data-i18n-key="selectYears">Jahre zum Vergleichen auswählen:</label>
+                        <div id="comparison-year-selector" class="flex flex-wrap gap-3">
+                            <!-- Year checkboxes will be injected here -->
+                        </div>
+                    </div>
+                    <div class="h-[28rem]" id="comparison-chart-container">
+                        <canvas id="comparison-chart"></canvas>
+                    </div>
+                    <div id="comparison-pie-charts-container" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
+                        <!-- Pie charts will be injected here -->
+                    </div>
+                    <div id="no-comparison-data" class="hidden h-[28rem] flex items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                        <p data-i18n-key="noComparisonData">Bitte wählen Sie mindestens zwei Jahre aus, um einen Vergleich zu sehen.</p>
+                    </div>
+                </div>
+                <!-- Comparison Deviation Chart -->
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4" data-i18n-key="comparisonDeviationTitle">Top 10 Kategorie-Abweichungen</h2>
+                    <div class="h-96" id="comparison-deviation-chart-container">
+                        <canvas id="comparison-deviation-chart"></canvas>
+                    </div>
+                    <div id="no-comparison-deviation-data" class="hidden h-96 flex items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                        <p data-i18n-key="noComparisonDeviationData">Nicht genügend Daten für einen Abweichungsvergleich vorhanden (mind. 2 Jahre benötigt).</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Transaction Table -->
+            <div id="transactions-view" class="view-container hidden">
+                 <div class="lg:col-span-5 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white" data-i18n-key="transactionList">Transaktionsliste</h2>
+                        <button id="clear-transaction-filter-btn" class="hidden px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" data-i18n-key="resetFilter">
+                            Filter zurücksetzen
+                        </button>
+                    </div>
+                    <!-- Transaction View Filters -->
+                    <div class="flex flex-wrap gap-x-6 gap-y-4 mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg items-center">
+                        <div>
+                            <label for="transaction-timeframe-select" class="block text-sm font-medium text-slate-700 dark:text-slate-300" data-i18n-key="timeRange">Zeitbereich</label>
+                            <select id="transaction-timeframe-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="all" data-i18n-key="timeRangeAll">Gesamt</option>
+                                <option value="timeline" data-i18n-key="timeRangeTimeline">Wie Zeitverlauf</option>
+                                <option value="custom" data-i18n-key="timeRangeCustom">Benutzerdefiniert</option>
+                            </select>
+                        </div>
+                        <div id="transaction-custom-date-range" class="hidden flex-wrap gap-x-6 gap-y-4 items-center">
+                             <div>
+                                <label for="transaction-start-date" class="block text-sm font-medium text-slate-700 dark:text-slate-300" data-i18n-key="dateFrom">Von</label>
+                                <input type="date" id="transaction-start-date" class="mt-1 block w-full pl-3 pr-2 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            </div>
+                            <div>
+                                <label for="transaction-end-date" class="block text-sm font-medium text-slate-700 dark:text-slate-300" data-i18n-key="dateTo">Bis</label>
+                                <input type="date" id="transaction-end-date" class="mt-1 block w-full pl-3 pr-2 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            </div>
+                        </div>
+                        <div class="self-end">
+                             <button class="category-filter-btn px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-i18n-key="filterCategories">
+                                Kategorien filtern
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Transaction Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500 dark:text-slate-400">
+                            <thead class="text-xs text-slate-700 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-700">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 transaction-sortable-header" data-sort-key="date" data-i18n-key="date">Datum <span class="sort-icon"></span></th>
+                                    <th scope="col" class="px-6 py-3 transaction-sortable-header" data-sort-key="description" data-i18n-key="description">Beschreibung <span class="sort-icon"></span></th>
+                                    <th scope="col" class="px-6 py-3 transaction-sortable-header" data-sort-key="category" data-i18n-key="category">Kategorie <span class="sort-icon"></span></th>
+                                    <th scope="col" class="px-6 py-3 transaction-sortable-header" data-sort-key="accountName" data-i18n-key="account">Konto <span class="sort-icon"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-right transaction-sortable-header" data-sort-key="amount" data-i18n-key="amount">Betrag <span class="sort-icon"></span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaction-table-tbody">
+                                <!-- Rows will be injected by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="no-timeline-transactions" class="hidden h-96 flex items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                        <p data-i18n-key="noTransactionsForFilter">Keine Transaktionen für diesen Zeitraum und Filter vorhanden.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Category Filter Modal -->
+    <div id="category-filter-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4 modal-backdrop">
+        <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col transform scale-95">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+                <h3 class="text-xl font-semibold text-slate-900 dark:text-white" data-i18n-key="filterCategories">Kategorien filtern</h3>
+            </div>
+            <div id="category-list-container" class="p-6 overflow-y-auto custom-scrollbar space-y-3 flex-grow">
+                <!-- Category checkboxes will be injected here -->
+            </div>
+            <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center rounded-b-2xl">
+                <div>
+                    <button id="select-all-btn" class="px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 dark:text-indigo-200 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900" data-i18n-key="selectAll">Alle auswählen</button>
+                    <button id="deselect-all-btn" class="ml-2 px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600" data-i18n-key="deselectAll">Alle abwählen</button>
+                </div>
+                <button id="apply-filter-btn" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" data-i18n-key="apply">Anwenden</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIconLight = document.getElementById('theme-icon-light');
+        const themeIconDark = document.getElementById('theme-icon-dark');
+        const langSwitcher = document.getElementById('lang-switcher');
+        const uploadSection = document.getElementById('upload-section');
+        const dashboardSection = document.getElementById('dashboard-section');
+        const csvFileInput = document.getElementById('csv-file-input');
+        const ratesJsonInput = document.getElementById('rates-json-input');
+        const ratesUploadSuccess = document.getElementById('rates-upload-success');
+        const uploadError = document.getElementById('upload-error');
+        const yearSelect = document.getElementById('year-select');
+        const monthSelect = document.getElementById('month-select');
+        const currencySelect = document.getElementById('currency-select');
+        const toggleSubcategoriesEl = document.getElementById('toggle-subcategories');
+        const resetButton = document.getElementById('reset-button');
+        const categoryFilterModal = document.getElementById('category-filter-modal');
+        const categoryListContainer = document.getElementById('category-list-container');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const deselectAllBtn = document.getElementById('deselect-all-btn');
+        const applyFilterBtn = document.getElementById('apply-filter-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingMessage = document.getElementById('loading-message');
+        const downloadRatesBtn = document.getElementById('download-rates-btn');
+        const ratesInfoContainer = document.getElementById('rates-info-container');
+        const ratesLoadedInfo = document.getElementById('rates-loaded-info');
+        const ratesAvailabilityGraph = document.getElementById('rates-availability-graph');
+        const viewButtons = document.querySelectorAll('.view-btn');
+        const viewContainers = document.querySelectorAll('.view-container');
+        const categoryFilterBtns = document.querySelectorAll('.category-filter-btn');
+
+        // Timeline View Elements
+        const timeframeSelect = document.getElementById('timeframe-select');
+        const timelineChartCanvas = document.getElementById('timeline-chart');
+        const totalTimelineChartCanvas = document.getElementById('total-timeline-chart');
+        const timelineSelectAllBtn = document.getElementById('timeline-select-all-btn');
+        const timelineDeselectAllBtn = document.getElementById('timeline-deselect-all-btn');
+        const timelineChartTypeSelect = document.getElementById('timeline-chart-type-select');
+
+        // Dashboard View Elements
+        const totalIncomeEl = document.getElementById('total-income');
+        const totalExpensesEl = document.getElementById('total-expenses');
+        const netSavingsEl = document.getElementById('net-savings');
+        const chartContainer = document.getElementById('chart-container');
+        const noChartDataEl = document.getElementById('no-chart-data');
+        const expenseChartCanvas = document.getElementById('expense-chart');
+        const transactionListEl = document.getElementById('transaction-list');
+        const noTransactionsEl = document.getElementById('no-transactions');
+        const detailedCategoryTbody = document.getElementById('detailed-category-tbody');
+        const sortableHeaders = document.querySelectorAll('.sortable-header');
+
+        // Comparison View Elements
+        const comparisonYearSelector = document.getElementById('comparison-year-selector');
+        const comparisonDataTypeSelect = document.getElementById('comparison-data-type-select');
+        const comparisonToggleSubcategoriesEl = document.getElementById('comparison-toggle-subcategories');
+        const comparisonChartCanvas = document.getElementById('comparison-chart');
+        const noComparisonDataEl = document.getElementById('no-comparison-data');
+        const comparisonChartContainer = document.getElementById('comparison-chart-container');
+        const comparisonDeviationChartCanvas = document.getElementById('comparison-deviation-chart');
+        const noComparisonDeviationDataEl = document.getElementById('no-comparison-deviation-data');
+        const comparisonDeviationChartContainer = document.getElementById('comparison-deviation-chart-container');
+        const comparisonViewBarBtn = document.getElementById('comparison-view-bar-btn');
+        const comparisonViewPieBtn = document.getElementById('comparison-view-pie-btn');
+        const comparisonPieChartsContainer = document.getElementById('comparison-pie-charts-container');
+
+
+        // Transaction Table View Elements
+        const transactionTableTbody = document.getElementById('transaction-table-tbody');
+        const transactionSortableHeaders = document.querySelectorAll('.transaction-sortable-header');
+        const noTimelineTransactions = document.getElementById('no-timeline-transactions');
+        const transactionTimeframeSelect = document.getElementById('transaction-timeframe-select');
+        const transactionCustomDateRange = document.getElementById('transaction-custom-date-range');
+        const transactionStartDate = document.getElementById('transaction-start-date');
+        const transactionEndDate = document.getElementById('transaction-end-date');
+        const clearTransactionFilterBtn = document.getElementById('clear-transaction-filter-btn');
+
+
+        // --- App State ---
+        let allTransactions = [];
+        let expenseChart = null;
+        let timelineChart = null;
+        let totalTimelineChart = null; 
+        let comparisonChart = null;
+        let comparisonDeviationChart = null;
+        let comparisonPieCharts = [];
+        let activeCategories = new Set();
+        let categoryOrder = [];
+        let sortState = { key: 'category', direction: 'asc' };
+        let transactionTableSortState = { key: 'date', direction: 'desc' };
+        let exchangeRates = {}; // Cache for exchange rates { 'YYYY-MM-DD': {eur: 1, jpy: 160, ...} }
+        let newRatesFetched = false;
+        let timelineCategoryVisibility = {};
+        let currentView = 'dashboard';
+        let isInitialized = false;
+        let transactionViewFilter = null; // e.g., 'uncategorized'
+        let currentLang = 'de';
+        let comparisonState = {
+            years: new Set(),
+            dataType: 'net', // 'net', 'income', 'expenses'
+            viewType: 'bar' // 'bar', 'pie'
+        };
+
+        // --- i18n ---
+        const translations = {
+            de: {
+                pageTitle: "My Expenses - Erweiterte Einblicke",
+                dashboardTitle: "My Expenses - Erweiterte Einblicke",
+                dashboardSubtitle: "Laden Sie Ihre CSV-Datei hoch, um eine detaillierte Analyse zu erhalten.",
+                loadingMessage: "Lade Daten...",
+                uploadRatesTitle: "Schritt 1 (Optional): Wechselkurse laden",
+                uploadRatesSubtitle: "Laden Sie eine vorhandene `exchange_rates.json`-Datei, um API-Anfragen zu sparen.",
+                selectJsonFile: "JSON-Datei auswählen",
+                ratesUploadSuccess: "✓ Wechselkurse erfolgreich geladen.",
+                uploadCsvTitle: "Schritt 2: Transaktionen hochladen",
+                uploadCsvSubtitle: "Ziehen Sie Ihre CSV-Datei hierher oder klicken Sie zum Auswählen.",
+                selectCsvFile: "CSV-Datei auswählen",
+                viewDashboard: "Dashboard",
+                viewTimeline: "Zeitverlauf",
+                viewComparison: "Vergleich",
+                viewTransactions: "Transaktionen",
+                currencyLabel: "Währung",
+                currencyEurConverted: "EUR (umgerechnet)",
+                currencyJpyConverted: "JPY (umgerechnet)",
+                currencyEurOnly: "Nur EUR",
+                currencyJpyOnly: "Nur JPY",
+                yearLabel: "Jahr",
+                monthLabel: "Monat",
+                showSubcategories: "Unterkategorien anzeigen",
+                filterCategories: "Kategorien filtern",
+                saveRates: "Kurse speichern",
+                uploadNewFile: "Neue Datei hochladen",
+                income: "Einnahmen",
+                expenses: "Ausgaben",
+                netResult: "Nettoergebnis",
+                expensesByCategory: "Ausgaben nach Kategorie",
+                noExpenseData: "Keine Ausgabendaten für diesen Zeitraum vorhanden.",
+                transactions: "Transaktionen",
+                noTransactions: "Keine Transaktionen für diesen Zeitraum vorhanden.",
+                detailedCategoryView: "Detaillierte Kategorienübersicht",
+                category: "Kategorie",
+                net: "Netto",
+                timelineByCategory: "Zeitverlauf nach Kategorien (gefiltert)",
+                selectAll: "Alle auswählen",
+                deselectAll: "Alle abwählen",
+                periodic: "Periodisch",
+                cumulative: "Kumulativ",
+                timeframe1m: "1 Monat",
+                timeframe6m: "6 Monate",
+                timeframe1y: "1 Jahr",
+                timeframe2y: "2 Jahre",
+                timeframe3y: "3 Jahre",
+                timeframe5y: "5 Jahre",
+                timeframe10y: "10 Jahre",
+                timeframeMax: "Max",
+                totalNetTimeline: "Gesamtverlauf Nettoergebnis (ungefiltert)",
+                transactionList: "Transaktionsliste",
+                resetFilter: "Filter zurücksetzen",
+                timeRange: "Zeitbereich",
+                timeRangeAll: "Gesamt",
+                timeRangeTimeline: "Wie Zeitverlauf",
+                timeRangeCustom: "Benutzerdefiniert",
+                dateFrom: "Von",
+                dateTo: "Bis",
+                date: "Datum",
+                description: "Beschreibung",
+                account: "Konto",
+                amount: "Betrag",
+                noTransactionsForFilter: "Keine Transaktionen für diesen Zeitraum und Filter vorhanden.",
+                apply: "Anwenden",
+                uncategorized: "Unkategorisiert",
+                ratesUpdated: "Wechselkurse aktualisiert.",
+                ratesFromCache: "Wechselkurse aus Cache.",
+                fetchRatesError: "Bitte wählen Sie eine gültige JSON-Datei aus.",
+                parseRatesError: "Fehler beim Parsen der JSON-Datei.",
+                readRatesError: "Fehler beim Lesen der Raten-Datei.",
+                fetchCsvError: "Bitte wählen Sie eine gültige CSV-Datei aus.",
+                processCsvError: "Fehler bei der Verarbeitung der Daten.",
+                readCsvError: "Fehler beim Lesen der CSV-Datei.",
+                emptyCsvError: "Die CSV-Datei ist leer oder es konnten keine gültigen Transaktionen gefunden werden.",
+                csvHeaderError: "CSV muss Spalten für Datum und einen Betrag (oder Einnahmen/Ausgaben) enthalten. Gefundene Spalten: ",
+                splitTransactionWarning: "Diskrepanz bei Split-Buchung in CSV-Zeile {line}: Summe der Splits ({sum}) ungleich dem Eltern-Betrag ({amount}).",
+                missingRatesWarning: "{count} benötigte Wechselkurse konnten nicht geladen werden. Beträge in Fremdwährung sind möglicherweise unvollständig.",
+                uncategorizedInfo: "Es wurden {count} unkategorisierte Transaktionen gefunden.",
+                assignNow: "Jetzt zuweisen",
+                loadingCsv: "Verarbeite CSV...",
+                loadingRates: "Lade Wechselkurse...",
+                loadingRatesProgress: "Lade Kurse {start}-{end} von {total}...",
+                months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+                yearAll: "Ganzes Jahr",
+                comparisonTitle: "Jahresvergleich",
+                selectYears: "Jahre zum Vergleichen auswählen:",
+                noComparisonData: "Bitte wählen Sie mindestens zwei Jahre aus, um einen Vergleich zu sehen.",
+                comparisonDeviationTitle: "Top 10 Kategorie-Abweichungen",
+                noComparisonDeviationData: "Nicht genügend Daten für einen Abweichungsvergleich vorhanden (mind. 2 Jahre benötigt).",
+                barChart: "Balkendiagramm",
+                pieCharts: "Kreisdiagramme"
+            },
+            en: {
+                pageTitle: "My Expenses - Extended Insight",
+                dashboardTitle: "My Expenses - Extended Insight",
+                dashboardSubtitle: "Upload your CSV file to get a detailed analysis.",
+                loadingMessage: "Loading data...",
+                uploadRatesTitle: "Step 1 (Optional): Load Exchange Rates",
+                uploadRatesSubtitle: "Load an existing `exchange_rates.json` file to save API requests.",
+                selectJsonFile: "Select JSON file",
+                ratesUploadSuccess: "✓ Exchange rates loaded successfully.",
+                uploadCsvTitle: "Step 2: Upload Transactions",
+                uploadCsvSubtitle: "Drag and drop your CSV file here or click to select.",
+                selectCsvFile: "Select CSV file",
+                viewDashboard: "Dashboard",
+                viewTimeline: "Timeline",
+                viewComparison: "Comparison",
+                viewTransactions: "Transactions",
+                currencyLabel: "Currency",
+                currencyEurConverted: "EUR (converted)",
+                currencyJpyConverted: "JPY (converted)",
+                currencyEurOnly: "EUR only",
+                currencyJpyOnly: "JPY only",
+                yearLabel: "Year",
+                monthLabel: "Month",
+                showSubcategories: "Show subcategories",
+                filterCategories: "Filter categories",
+                saveRates: "Save rates",
+                uploadNewFile: "Upload new file",
+                income: "Income",
+                expenses: "Expenses",
+                netResult: "Net result",
+                expensesByCategory: "Expenses by Category",
+                noExpenseData: "No expense data available for this period.",
+                transactions: "Transactions",
+                noTransactions: "No transactions available for this period.",
+                detailedCategoryView: "Detailed Category View",
+                category: "Category",
+                net: "Net",
+                timelineByCategory: "Timeline by Category (filtered)",
+                selectAll: "Select all",
+                deselectAll: "Deselect all",
+                periodic: "Periodic",
+                cumulative: "Cumulative",
+                timeframe1m: "1 month",
+                timeframe6m: "6 months",
+                timeframe1y: "1 year",
+                timeframe2y: "2 years",
+                timeframe3y: "3 years",
+                timeframe5y: "5 years",
+                timeframe10y: "10 years",
+                timeframeMax: "Max",
+                totalNetTimeline: "Total Net Result Timeline (unfiltered)",
+                transactionList: "Transaction List",
+                resetFilter: "Reset filter",
+                timeRange: "Time range",
+                timeRangeAll: "All",
+                timeRangeTimeline: "Like timeline",
+                timeRangeCustom: "Custom",
+                dateFrom: "From",
+                dateTo: "To",
+                date: "Date",
+                description: "Description",
+                account: "Account",
+                amount: "Amount",
+                noTransactionsForFilter: "No transactions for this period and filter.",
+                apply: "Apply",
+                uncategorized: "Uncategorized",
+                ratesUpdated: "Exchange rates updated.",
+                ratesFromCache: "Exchange rates from cache.",
+                fetchRatesError: "Please select a valid JSON file.",
+                parseRatesError: "Error parsing the JSON file.",
+                readRatesError: "Error reading the rates file.",
+                fetchCsvError: "Please select a valid CSV file.",
+                processCsvError: "Error processing data.",
+                readCsvError: "Error reading the CSV file.",
+                emptyCsvError: "The CSV file is empty or no valid transactions could be found.",
+                csvHeaderError: "CSV must contain columns for date and an amount (or income/expense). Found columns: ",
+                splitTransactionWarning: "Discrepancy in split transaction on CSV line {line}: Sum of splits ({sum}) does not equal parent amount ({amount}).",
+                missingRatesWarning: "{count} required exchange rates could not be loaded. Amounts in foreign currency may be incomplete.",
+                uncategorizedInfo: "Found {count} uncategorized transactions.",
+                assignNow: "Assign now",
+                loadingCsv: "Processing CSV...",
+                loadingRates: "Fetching exchange rates...",
+                loadingRatesProgress: "Fetching rates {start}-{end} of {total}...",
+                months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+                yearAll: "Whole Year",
+                comparisonTitle: "Yearly Comparison",
+                selectYears: "Select years to compare:",
+                noComparisonData: "Please select at least two years to see a comparison.",
+                comparisonDeviationTitle: "Top 10 Category Deviations",
+                noComparisonDeviationData: "Not enough data for a deviation comparison (min. 2 years required).",
+                barChart: "Bar Chart",
+                pieCharts: "Pie Charts"
+            },
+            ja: {
+                pageTitle: "My Expenses - 詳細な洞察",
+                dashboardTitle: "My Expenses - 詳細な洞察",
+                dashboardSubtitle: "CSVファイルをアップロードして詳細な分析を取得します。",
+                loadingMessage: "データを読み込み中...",
+                uploadRatesTitle: "ステップ1（任意）：為替レートを読み込む",
+                uploadRatesSubtitle: "既存の `exchange_rates.json` ファイルを読み込んでAPIリクエストを節約します。",
+                selectJsonFile: "JSONファイルを選択",
+                ratesUploadSuccess: "✓ 為替レートが正常に読み込まれました。",
+                uploadCsvTitle: "ステップ2：取引をアップロード",
+                uploadCsvSubtitle: "CSVファイルをここにドラッグ＆ドロップするか、クリックして選択します。",
+                selectCsvFile: "CSVファイルを選択",
+                viewDashboard: "ダッシュボード",
+                viewTimeline: "タイムライン",
+                viewComparison: "比較",
+                viewTransactions: "取引",
+                currencyLabel: "通貨",
+                currencyEurConverted: "EUR（換算後）",
+                currencyJpyConverted: "JPY（換算後）",
+                currencyEurOnly: "EURのみ",
+                currencyJpyOnly: "JPYのみ",
+                yearLabel: "年",
+                monthLabel: "月",
+                showSubcategories: "サブカテゴリを表示",
+                filterCategories: "カテゴリをフィルター",
+                saveRates: "レートを保存",
+                uploadNewFile: "新しいファイルをアップロード",
+                income: "収入",
+                expenses: "支出",
+                netResult: "純損益",
+                expensesByCategory: "カテゴリ別支出",
+                noExpenseData: "この期間の支出データはありません。",
+                transactions: "取引",
+                noTransactions: "この期間の取引はありません。",
+                detailedCategoryView: "詳細カテゴリビュー",
+                category: "カテゴリ",
+                net: "純額",
+                timelineByCategory: "カテゴリ別タイムライン（フィルター済み）",
+                selectAll: "すべて選択",
+                deselectAll: "すべて選択解除",
+                periodic: "定期的",
+                cumulative: "累積",
+                timeframe1m: "1ヶ月",
+                timeframe6m: "6ヶ月",
+                timeframe1y: "1年",
+                timeframe2y: "2年",
+                timeframe3y: "3年",
+                timeframe5y: "5年",
+                timeframe10y: "10年",
+                timeframeMax: "最大",
+                totalNetTimeline: "総純損益タイムライン（フィルターなし）",
+                transactionList: "取引リスト",
+                resetFilter: "フィルターをリセット",
+                timeRange: "期間",
+                timeRangeAll: "すべて",
+                timeRangeTimeline: "タイムラインと同じ",
+                timeRangeCustom: "カスタム",
+                dateFrom: "から",
+                dateTo: "まで",
+                date: "日付",
+                description: "説明",
+                account: "アカウント",
+                amount: "金額",
+                noTransactionsForFilter: "この期間とフィルターに該当する取引はありません。",
+                apply: "適用",
+                uncategorized: "未分類",
+                ratesUpdated: "為替レートが更新されました。",
+                ratesFromCache: "キャッシュから為替レートを取得しました。",
+                fetchRatesError: "有効なJSONファイルを選択してください。",
+                parseRatesError: "JSONファイルの解析中にエラーが発生しました。",
+                readRatesError: "レートファイルの読み取り中にエラーが発生しました。",
+                fetchCsvError: "有効なCSVファイルを選択してください。",
+                processCsvError: "データの処理中にエラーが発生しました。",
+                readCsvError: "CSVファイルの読み取り中にエラーが発生しました。",
+                emptyCsvError: "CSVファイルが空か、有効な取引が見つかりませんでした。",
+                csvHeaderError: "CSVには日付と金額（または収入/支出）の列が必要です。見つかった列：",
+                splitTransactionWarning: "CSV行{line}の分割取引に不一致があります：分割の合計（{sum}）が親の金額（{amount}）と一致しません。",
+                missingRatesWarning: "必要な為替レート{count}件が読み込めませんでした。外貨での金額が不完全な場合があります。",
+                uncategorizedInfo: "{count}件の未分類の取引が見つかりました。",
+                assignNow: "今すぐ割り当てる",
+                loadingCsv: "CSVを処理中...",
+                loadingRates: "為替レートを取得中...",
+                loadingRatesProgress: "{total}件中{start}-{end}件のレートを取得中...",
+                months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+                yearAll: "通年",
+                comparisonTitle: "年次比較",
+                selectYears: "比較する年を選択してください：",
+                noComparisonData: "比較を表示するには、少なくとも2つの年を選択してください。",
+                comparisonDeviationTitle: "トップ10のカテゴリ乖離",
+                noComparisonDeviationData: "乖離比較に十分なデータがありません（最低2年必要）。",
+                barChart: "棒グラフ",
+                pieCharts: "円グラフ"
+            }
+        };
+
+        const getTranslation = (key, replacements = {}) => {
+            let translation = translations[currentLang]?.[key] || translations.de[key];
+            for (const placeholder in replacements) {
+                translation = translation.replace(`{${placeholder}}`, replacements[placeholder]);
+            }
+            return translation;
+        };
+
+        const updateText = () => {
+            document.querySelectorAll('[data-i18n-key]').forEach(el => {
+                const key = el.dataset.i18nKey;
+                // Use innerHTML for titles that might contain entities, otherwise textContent
+                if (key === 'pageTitle' || key === 'dashboardTitle') {
+                    el.innerHTML = getTranslation(key);
+                } else {
+                    el.textContent = getTranslation(key);
+                }
+            });
+            document.documentElement.lang = currentLang;
+            // Update dynamic elements
+            if(isInitialized) {
+                populateFilters();
+                updateDashboard(false);
+            }
+        };
+
+        const setLanguage = (lang) => {
+            currentLang = lang;
+            langSwitcher.value = lang;
+            localStorage.setItem('language', lang);
+            updateText();
+        };
+
+        const initializeLanguage = () => {
+            const savedLang = localStorage.getItem('language');
+            const browserLang = navigator.language.split('-')[0];
+            const lang = savedLang || (['de', 'en', 'ja'].includes(browserLang) ? browserLang : 'de');
+            setLanguage(lang);
+        };
+
+
+        // --- Expanded Color Palette ---
+        const categoryColors = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+            '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
+            '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173', '#5254a3', '#6b6ecf', '#e7ba52', '#bd9e39', '#ad494a',
+            '#8ca252', '#d6616b'
+        ];
+
+        // --- Formatters ---
+        const formatters = {
+            de: {
+                EUR: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
+                JPY: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'JPY' }),
+                date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            },
+            en: {
+                EUR: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }),
+                JPY: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'JPY' }),
+                date: new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            },
+            ja: {
+                EUR: new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'EUR' }),
+                JPY: new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }),
+                date: new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+            }
+        };
+        const dateToISO = (date) => date.toISOString().split('T')[0];
+
+        // --- Theme Management ---
+        const applyTheme = (theme) => {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                themeIconLight.classList.remove('hidden');
+                themeIconDark.classList.add('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIconLight.classList.add('hidden');
+                themeIconDark.classList.remove('hidden');
+            }
+            // Update Chart.js defaults for dark/light mode
+            const chartFontColor = theme === 'dark' ? '#cbd5e1' : '#64748b'; // slate-300 or slate-500
+            Chart.defaults.color = chartFontColor;
+            Chart.defaults.borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            if (expenseChart) expenseChart.update();
+            if (timelineChart) timelineChart.update();
+            if (totalTimelineChart) totalTimelineChart.update();
+            if (comparisonChart) comparisonChart.update();
+            if (comparisonDeviationChart) comparisonDeviationChart.update();
+            comparisonPieCharts.forEach(c => c.update());
+        };
+
+        const toggleTheme = () => {
+            const currentTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', currentTheme);
+            applyTheme(currentTheme);
+        };
+
+        const initializeTheme = () => {
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+            applyTheme(theme);
+        };
+        
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeTheme();
+            initializeLanguage();
+            Chart.register(ChartDataLabels); // Register the datalabels plugin
+            initializeFromUrl();
+        });
+        window.addEventListener('popstate', initializeFromUrl);
+        themeToggle.addEventListener('click', toggleTheme);
+        langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
+
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const csvDropZone = csvFileInput.closest('div.text-center');
+            csvDropZone.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+        });
+        uploadSection.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            const csvDropZone = csvFileInput.closest('div.text-center');
+            csvDropZone.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+        });
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const csvDropZone = csvFileInput.closest('div.text-center');
+            csvDropZone.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        csvFileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        ratesJsonInput.addEventListener('change', (e) => handleRatesFile(e.target.files[0]));
+        downloadRatesBtn.addEventListener('click', downloadRatesJSON);
+
+        // Global and Dashboard Filters
+        yearSelect.addEventListener('change', updateDashboard);
+        monthSelect.addEventListener('change', updateDashboard);
+        currencySelect.addEventListener('change', updateDashboard);
+        toggleSubcategoriesEl.addEventListener('change', updateDashboard);
+        resetButton.addEventListener('click', resetApp);
+        
+        // Timeline Filters
+        timeframeSelect.addEventListener('change', updateDashboard);
+        timelineChartTypeSelect.addEventListener('change', updateDashboard);
+
+        // Comparison Filters
+        comparisonDataTypeSelect.addEventListener('change', () => {
+            comparisonState.dataType = comparisonDataTypeSelect.value;
+            updateDashboard();
+        });
+        comparisonToggleSubcategoriesEl.addEventListener('change', updateDashboard);
+        comparisonViewBarBtn.addEventListener('click', () => {
+            comparisonState.viewType = 'bar';
+            comparisonViewBarBtn.classList.add('active');
+            comparisonViewPieBtn.classList.remove('active');
+            updateDashboard();
+        });
+        comparisonViewPieBtn.addEventListener('click', () => {
+            comparisonState.viewType = 'pie';
+            comparisonViewPieBtn.classList.add('active');
+            comparisonViewBarBtn.classList.remove('active');
+            updateDashboard();
+        });
+
+
+        // Transaction Table Filters
+        transactionTimeframeSelect.addEventListener('change', () => {
+            transactionCustomDateRange.classList.toggle('hidden', transactionTimeframeSelect.value !== 'custom');
+            updateDashboard();
+        });
+        transactionStartDate.addEventListener('change', updateDashboard);
+        transactionEndDate.addEventListener('change', updateDashboard);
+        clearTransactionFilterBtn.addEventListener('click', () => {
+            transactionViewFilter = null;
+            updateDashboard();
+        });
+
+        // Category Modal
+        const openCategoryModal = () => {
+            populateCategoryFilter();
+            categoryFilterModal.classList.remove('hidden');
+            categoryFilterModal.classList.add('flex');
+            setTimeout(() => categoryFilterModal.querySelector('.modal-content').classList.remove('scale-95'), 10);
+        };
+        categoryFilterBtns.forEach(btn => btn.addEventListener('click', openCategoryModal));
+
+        applyFilterBtn.addEventListener('click', () => {
+            const checkboxes = categoryListContainer.querySelectorAll('input[type="checkbox"]');
+            activeCategories = new Set();
+            checkboxes.forEach(cb => {
+                if (cb.checked || cb.indeterminate) {
+                    activeCategories.add(cb.value);
+                    if (cb.dataset.isMain) {
+                         const mainCat = cb.value;
+                         categoryListContainer.querySelectorAll(`input[data-main="${mainCat}"]`).forEach(subCb => {
+                            if (subCb.checked) activeCategories.add(subCb.value);
+                         });
+                    }
+                }
+            });
+            categoryFilterModal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => {
+                categoryFilterModal.classList.add('hidden');
+                categoryFilterModal.classList.remove('flex');
+            }, 300);
+            updateDashboard();
+        });
+        selectAllBtn.addEventListener('click', () => {
+            categoryListContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+                cb.indeterminate = false;
+            });
+        });
+        deselectAllBtn.addEventListener('click', () => {
+            categoryListContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+                cb.indeterminate = false;
+            });
+        });
+
+        // Table Sorting
+        detailedCategoryTbody.addEventListener('click', (e) => {
+            const row = e.target.closest('.expand-row');
+            if (row) {
+                const mainCategory = row.dataset.mainCategory;
+                document.querySelectorAll(`.sub-row[data-parent-category="${mainCategory}"]`).forEach(subRow => {
+                    subRow.classList.toggle('hidden');
+                });
+                row.classList.toggle('expanded');
+            }
+        });
+        sortableHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const key = header.dataset.sortKey;
+                if (sortState.key === key) {
+                    sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortState.key = key;
+                    sortState.direction = 'asc';
+                }
+                updateDashboard();
+            });
+        });
+        
+        let draggedItem = null;
+        detailedCategoryTbody.addEventListener('dragstart', (e) => {
+            draggedItem = e.target;
+            setTimeout(() => {
+                e.target.classList.add('dragging');
+            }, 0);
+        });
+
+        detailedCategoryTbody.addEventListener('dragend', (e) => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+            }
+            draggedItem = null;
+        });
+
+        detailedCategoryTbody.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const target = e.target.closest('tr.main-row');
+            if (target && target !== draggedItem) {
+                document.querySelectorAll('.drag-over-border').forEach(el => el.classList.remove('drag-over-border'));
+                target.classList.add('drag-over-border');
+            }
+        });
+
+        detailedCategoryTbody.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const dropTarget = e.target.closest('tr.main-row');
+            document.querySelectorAll('.drag-over-border').forEach(el => el.classList.remove('drag-over-border'));
+            
+            if (dropTarget && draggedItem && dropTarget !== draggedItem) {
+                const draggedCategory = draggedItem.dataset.mainCategory;
+                const targetCategory = dropTarget.dataset.mainCategory;
+                
+                const draggedIndex = categoryOrder.indexOf(draggedCategory);
+                
+                if (draggedIndex === -1) return;
+
+                const [movedItem] = categoryOrder.splice(draggedIndex, 1);
+                
+                const newTargetIndex = categoryOrder.indexOf(targetCategory);
+                if (newTargetIndex === -1) {
+                    categoryOrder.splice(draggedIndex, 0, movedItem);
+                    return;
+                }
+
+                const rect = dropTarget.getBoundingClientRect();
+                const dropAfter = e.clientY > rect.top + rect.height / 2;
+                
+                categoryOrder.splice(newTargetIndex + (dropAfter ? 1 : 0), 0, movedItem);
+
+                sortState.key = 'manual';
+                updateDashboard();
+            }
+        });
+
+        // View Switching
+        viewButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const view = button.dataset.view;
+                if (view !== currentView) {
+                    currentView = view;
+                    transactionViewFilter = null; // Reset filter on view change
+                    updateDashboard();
+                }
+            });
+        });
+        
+        timelineSelectAllBtn.addEventListener('click', () => {
+            if (!timelineChart) return;
+            timelineChart.data.datasets.forEach((dataset, i) => {
+                 timelineChart.setDatasetVisibility(i, true);
+                 timelineCategoryVisibility[dataset.label] = true;
+            });
+            timelineChart.update();
+        });
+
+        timelineDeselectAllBtn.addEventListener('click', () => {
+            if (!timelineChart) return;
+            timelineChart.data.datasets.forEach((dataset, i) => {
+                timelineChart.setDatasetVisibility(i, false);
+                timelineCategoryVisibility[dataset.label] = false;
+            });
+            timelineChart.update();
+        });
+
+        transactionSortableHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const key = header.dataset.sortKey;
+                if (transactionTableSortState.key === key) {
+                    transactionTableSortState.direction = transactionTableSortState.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    transactionTableSortState.key = key;
+                    transactionTableSortState.direction = 'asc';
+                }
+                updateDashboard();
+            });
+        });
+
+        /**
+         * Handles the exchange rates JSON file upload.
+         * @param {File} file The uploaded JSON file.
+         */
+        function handleRatesFile(file) {
+            if (!file) {
+                showError(getTranslation('fetchRatesError'));
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    let jsonText;
+                    if (file.name.endsWith('.gz')) {
+                        const inflated = pako.inflate(new Uint8Array(e.target.result), { to: 'string' });
+                        jsonText = inflated;
+                    } else {
+                        jsonText = e.target.result;
+                    }
+                    exchangeRates = JSON.parse(jsonText);
+                    ratesUploadSuccess.classList.remove('hidden');
+                    downloadRatesBtn.disabled = false;
+                    console.log(`${Object.keys(exchangeRates).length} exchange rates loaded from file.`);
+                } catch (error) {
+                    showError(getTranslation('parseRatesError'));
+                    console.error('JSON Parse Error:', error);
+                }
+            };
+            reader.onerror = () => showError(getTranslation('readRatesError'));
+
+            if (file.name.endsWith('.gz')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        /**
+         * Triggers the download of the current exchange rates cache as a minified JSON file.
+         */
+        function downloadRatesJSON() {
+            // Minify JSON by removing whitespace from the string representation
+            const jsonString = JSON.stringify(exchangeRates);
+            
+            // Create a Blob with the JSON content
+            const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", url);
+            // Download as a .json file, not .gz
+            downloadAnchorNode.setAttribute("download", "exchange_rates.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            URL.revokeObjectURL(url);
+        }
+
+
+        /**
+         * Handles the transaction CSV file upload.
+         * @param {File} file The uploaded CSV file.
+         */
+        function handleFile(file) {
+            if (!file || !file.type.match('text/csv')) {
+                showError(getTranslation('fetchCsvError'));
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    await processDataAndInitialize(e.target.result);
+                } catch (error) {
+                    console.error('Processing Error:', error);
+                    showError(error.message);
+                    hideLoading();
+                }
+            };
+            reader.onerror = () => showError(getTranslation('readCsvError'));
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        /**
+         * Orchestrates the main data processing and UI initialization flow.
+         * @param {string} csvText The raw CSV string.
+         */
+        async function processDataAndInitialize(csvText) {
+            showLoading(getTranslation('loadingCsv'));
+            let localAlerts = [];
+
+            const { transactions: parsedData, alerts: parsingAlerts } = parseCSV(csvText);
+            localAlerts.push(...parsingAlerts);
+
+            if (parsedData.length === 0) {
+                throw new Error(getTranslation('emptyCsvError'));
+            }
+            allTransactions = parsedData;
+
+            // Check for uncategorized transactions
+            const uncategorizedCount = allTransactions.filter(t => t.mainCategory === getTranslation('uncategorized')).length;
+            if (uncategorizedCount > 0) {
+                localAlerts.push({
+                    type: 'info',
+                    message: getTranslation('uncategorizedInfo', { count: uncategorizedCount }),
+                    action: {
+                        text: getTranslation('assignNow'),
+                        handler: () => {
+                            transactionViewFilter = 'uncategorized';
+                            currentView = 'transactions';
+                            updateDashboard();
+                        }
+                    }
+                });
+            }
+
+            const { alerts: rateAlerts } = await fetchAllExchangeRates(allTransactions);
+            localAlerts.push(...rateAlerts);
+            
+            renderAlerts(localAlerts);
+
+            isInitialized = true;
+            initializeFromUrl();
+            hideLoading();
+        }
+        
+        function detectDelimiter(csvText) {
+            const firstLine = csvText.split('\n')[0];
+            const commaCount = (firstLine.match(/,/g) || []).length;
+            const semicolonCount = (firstLine.match(/;/g) || []).length;
+            return semicolonCount > commaCount ? ';' : ',';
+        }
+
+        function flexibleParseFloat(str) {
+            if (typeof str !== 'string' || str.trim() === '') return 0;
+            
+            const cleanedStr = str.replace(/[^0-9.,-]/g, '');
+            
+            const lastComma = cleanedStr.lastIndexOf(',');
+            const lastDot = cleanedStr.lastIndexOf('.');
+
+            let numberStr;
+            if (lastComma > lastDot) {
+                // German format: "1.234,56"
+                numberStr = cleanedStr.replace(/\./g, '').replace(',', '.');
+            } else if (lastDot > lastComma) {
+                // English format: "1,234.56"
+                numberStr = cleanedStr.replace(/,/g, '');
+            } else {
+                // No thousands separators, or only one type
+                numberStr = cleanedStr.replace(',', '.');
+            }
+            
+            const num = parseFloat(numberStr);
+            return isNaN(num) ? 0 : num;
+        }
+
+        function flexibleParseDate(dateStr) {
+            if (typeof dateStr !== 'string' || dateStr.trim() === '') return null;
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const d = new Date(dateStr);
+                if (!isNaN(d)) return d;
+            }
+
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
+                const parts = dateStr.split('.');
+                const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                if (!isNaN(d)) return d;
+            }
+            
+            if (/^\d{2}\.\d{2}\.\d{2}$/.test(dateStr)) {
+                const parts = dateStr.split('.');
+                const year = parseInt(parts[2], 10) + 2000;
+                const d = new Date(`${year}-${parts[1]}-${parts[0]}`);
+                if (!isNaN(d)) return d;
+            }
+            
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+                const parts = dateStr.split('/');
+                let d;
+                if (parseInt(parts[0], 10) > 12) {
+                    d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                } else {
+                    d = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+                }
+                if (!isNaN(d)) return d;
+            }
+            
+            const d = new Date(dateStr);
+            return isNaN(d) ? null : d;
+        }
+        
+        function parseCsvRow(row, delimiter) {
+            const values = [];
+            let currentVal = '';
+            let inQuotes = false;
+            for (let i = 0; i < row.length; i++) {
+                const char = row[i];
+                const nextChar = row[i + 1];
+
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        currentVal += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === delimiter && !inQuotes) {
+                    values.push(currentVal);
+                    currentVal = '';
+                } else {
+                    currentVal += char;
+                }
+            }
+            values.push(currentVal);
+            return values;
+        }
+
+        /**
+         * Parses the CSV text, handling split transactions correctly.
+         * @param {string} csvText The raw CSV string.
+         * @returns {{transactions: Array<Object>, alerts: Array<Object>}} An object containing processed transactions and any parsing alerts.
+         */
+        function parseCSV(csvText) {
+            const localAlerts = [];
+            const delimiter = detectDelimiter(csvText);
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length < 2) {
+                throw new Error(getTranslation('emptyCsvError'));
+            }
+            const header = parseCsvRow(lines.shift(), delimiter).map(h => h.trim().toLowerCase());
+
+            const dateAliases = ['date', 'datum', 'buchungsdatum', 'valutadatum'];
+            const descriptionAliases = ['description', 'beschreibung', 'verwendungszweck', 'buchungstext', 'payee/payer', 'auftraggeber/empfänger'];
+            const categoryAliases = ['category', 'kategorie', 'category 1'];
+            const subCategoryAliases = ['subcategory', 'unterkategorie', 'category 2'];
+            const amountAliases = ['amount', 'betrag'];
+            const incomeAliases = ['income', 'einnahmen'];
+            const expenseAliases = ['expense', 'ausgaben'];
+            const accountAliases = ['account', 'konto'];
+
+            const dateIndex = header.findIndex(h => dateAliases.includes(h));
+            const descIndex = header.findIndex(h => descriptionAliases.includes(h));
+            const catIndex = header.findIndex(h => categoryAliases.includes(h));
+            const subCatIndex = header.findIndex(h => subCategoryAliases.includes(h));
+            const amountIndex = header.findIndex(h => amountAliases.includes(h));
+            const incomeIndex = header.findIndex(h => incomeAliases.includes(h));
+            const expenseIndex = header.findIndex(h => expenseAliases.includes(h));
+            const accountIndex = header.findIndex(h => accountAliases.includes(h));
+
+            if (dateIndex === -1 || (amountIndex === -1 && (incomeIndex === -1 || expenseIndex === -1))) {
+                throw new Error(getTranslation('csvHeaderError') + header.join(', '));
+            }
+
+            const rawTransactions = [];
+            let lastAccountName = '';
+
+            lines.forEach((line, i) => {
+                if (line.trim() === '') return;
+                const values = parseCsvRow(line, delimiter);
+                if (values.length < header.length) {
+                    console.warn(`Line ${i + 2} skipped: column count mismatch.`);
+                    return;
+                }
+                let accountName = (accountIndex !== -1 ? values[accountIndex] : '').trim();
+                const isSplitChild = !accountName;
+                if (accountName) {
+                    lastAccountName = accountName;
+                } else {
+                    accountName = lastAccountName;
+                }
+                if (!accountName) {
+                    console.warn(`Line ${i + 2} skipped: No account assigned and no previous line with an account found.`);
+                    return;
+                }
+                const date = flexibleParseDate(values[dateIndex]);
+                let amount;
+                if (amountIndex !== -1) {
+                    amount = flexibleParseFloat(values[amountIndex]);
+                } else {
+                    const income = flexibleParseFloat(values[incomeIndex] || '0');
+                    const expense = flexibleParseFloat(values[expenseIndex] || '0');
+                    amount = income - expense;
+                }
+                if (date === null || isNaN(amount)) {
+                    console.warn(`Line ${i + 2} skipped: Invalid date or amount.`, { line, date, amount });
+                    return;
+                }
+                const currency = accountName.startsWith('¥') ? 'JPY' : 'EUR';
+                const mainCategory = (catIndex !== -1 ? values[catIndex] : '').trim() || getTranslation('uncategorized');
+                const subCategory = (subCatIndex !== -1 ? values[subCatIndex] : '').trim();
+                let combinedCategory = mainCategory && subCategory ? `${mainCategory} / ${subCategory}` : mainCategory;
+                rawTransactions.push({ date, description: descIndex !== -1 ? values[descIndex] : 'N/A', mainCategory, combinedCategory, amount, currency, accountName, isSplitChild, originalLine: i + 2 });
+            });
+
+            const finalTransactions = [];
+            let i = 0;
+            while (i < rawTransactions.length) {
+                const parent = rawTransactions[i];
+                const isPotentialParent = !parent.isSplitChild && (parent.mainCategory === getTranslation('uncategorized') || parent.mainCategory.toLowerCase() === 'split') && (rawTransactions[i + 1] && rawTransactions[i + 1].isSplitChild);
+                if (isPotentialParent) {
+                    const children = [];
+                    let j = i + 1;
+                    while (j < rawTransactions.length && rawTransactions[j].isSplitChild) {
+                        children.push(rawTransactions[j]);
+                        j++;
+                    }
+                    if (children.length > 0) {
+                        const childrenSum = children.reduce((sum, child) => sum + child.amount, 0);
+                        const epsilon = 0.01;
+                        if (Math.abs(parent.amount - childrenSum) > epsilon) {
+                            const discrepancyMessage = getTranslation('splitTransactionWarning', {
+                                line: parent.originalLine,
+                                sum: childrenSum.toFixed(2),
+                                amount: parent.amount.toFixed(2)
+                            });
+                            console.warn(discrepancyMessage);
+                            localAlerts.push({ type: 'warning', message: discrepancyMessage });
+                            finalTransactions.push(parent);
+                            i++;
+                            continue;
+                        } else {
+                            children.forEach(child => finalTransactions.push(child));
+                            i = j;
+                            continue;
+                        }
+                    }
+                }
+                finalTransactions.push(parent);
+                i++;
+            }
+            
+            return {
+                transactions: finalTransactions.map(({ isSplitChild, originalLine, ...rest }) => rest),
+                alerts: localAlerts
+            };
+        }
+
+        /**
+         * Fetches all required exchange rates for the given transactions.
+         * @param {Array<Object>} transactions The list of all transactions.
+         * @returns {{alerts: Array<Object>}} An object containing any alerts generated during the fetch process.
+         */
+        async function fetchAllExchangeRates(transactions) {
+            const localAlerts = [];
+            const uniqueDates = [...new Set(transactions.map(t => dateToISO(t.date)))];
+            const foreignCurrencyDates = new Set(transactions.filter(t => t.currency !== 'EUR').map(t => dateToISO(t.date)));
+            
+            const datesToFetch = uniqueDates.filter(date => !exchangeRates[date] || exchangeRates[date] === null);
+
+            if (datesToFetch.length > 0) {
+                showLoading(getTranslation('loadingRates'));
+                
+                const chunkSize = 100;
+                let successfulFetches = 0;
+                const totalToFetch = datesToFetch.length;
+
+                for (let i = 0; i < totalToFetch; i += chunkSize) {
+                    const chunk = datesToFetch.slice(i, i + chunkSize);
+                    loadingMessage.textContent = getTranslation('loadingRatesProgress', {
+                        start: i + 1,
+                        end: Math.min(i + chunkSize, totalToFetch),
+                        total: totalToFetch
+                    });
+                    
+                    const promises = chunk.map(async (dateStr) => {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+                        const url = `https://${dateStr}.currency-api.pages.dev/v1/currencies/eur.json`;
+                        try {
+                            const response = await fetch(url, { signal: controller.signal });
+                            if (response.status === 404) throw new Error('Not Found (404)');
+                            if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                            const data = await response.json();
+                            if (!data.eur) throw new Error(`No EUR data for ${dateStr} in API response.`);
+                            exchangeRates[dateStr] = data.eur;
+                            successfulFetches++;
+                        } catch (error) {
+                            console.error(`Error fetching rate for ${dateStr}:`, error.name === 'AbortError' ? 'Timeout' : error.message);
+                        } finally {
+                            clearTimeout(timeoutId);
+                        }
+                    });
+                    await Promise.all(promises);
+                }
+                
+                if (successfulFetches > 0) newRatesFetched = true;
+                hideLoading();
+            }
+
+            const missingNeededRates = [...foreignCurrencyDates].filter(date => !exchangeRates[date] || exchangeRates[date] === null);
+            if (missingNeededRates.length > 0) {
+                localAlerts.push({
+                    type: 'warning',
+                    message: getTranslation('missingRatesWarning', { count: missingNeededRates.length })
+                });
+            }
+
+            if (uniqueDates.length > 0) {
+                ratesInfoContainer.classList.remove('hidden');
+                downloadRatesBtn.disabled = false;
+                const hasMissingNeeded = missingNeededRates.length > 0;
+                
+                ratesLoadedInfo.textContent = newRatesFetched ? getTranslation('ratesUpdated') : getTranslation('ratesFromCache');
+                ratesLoadedInfo.className = 'text-sm mb-1 text-right dark:text-slate-400';
+                if (hasMissingNeeded) {
+                    ratesLoadedInfo.classList.add('text-red-600', 'dark:text-red-400', 'font-semibold');
+                } else {
+                    ratesLoadedInfo.classList.add('text-slate-500', 'dark:text-slate-400');
+                }
+                renderRatesAvailabilityGraph(uniqueDates, foreignCurrencyDates, hasMissingNeeded);
+            }
+
+            return { alerts: localAlerts };
+        }
+        
+        /**
+         * Renders a single timeline bar showing the availability of exchange rates.
+         * @param {string[]} requiredDates - An array of unique date strings with any transaction.
+         * @param {Set<string>} neededDates - A set of date strings where a foreign currency transaction occurred.
+         * @param {boolean} hasMissingNeeded - Flag if needed rates are missing.
+         */
+        function renderRatesAvailabilityGraph(requiredDates, neededDates, hasMissingNeeded) {
+            ratesAvailabilityGraph.innerHTML = '';
+            if (requiredDates.length === 0) return;
+
+            ratesAvailabilityGraph.classList.toggle('missing-needed', hasMissingNeeded);
+
+            const sortedDates = requiredDates.sort();
+            const minDate = new Date(sortedDates[0]);
+            const maxDate = new Date(sortedDates[sortedDates.length - 1]);
+            
+            const totalDays = (maxDate - minDate) / (1000 * 60 * 60 * 24) + 1;
+
+            const barTrack = document.createElement('div');
+            barTrack.className = 'bar-track';
+
+            const requiredDatesSet = new Set(requiredDates);
+            const fragment = document.createDocumentFragment();
+
+            for (let d = new Date(minDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
+                const dateStr = dateToISO(d);
+                const segment = document.createElement('div');
+                segment.className = 'bar-segment';
+                segment.style.flexBasis = `${100 / totalDays}%`;
+
+                if (requiredDatesSet.has(dateStr)) {
+                    const isLoaded = exchangeRates[dateStr] !== undefined && exchangeRates[dateStr] !== null;
+                    if (isLoaded) {
+                        segment.classList.add('bg-green-500');
+                        segment.title = `${dateStr}: Loaded`;
+                    } else {
+                        const isNeeded = neededDates.has(dateStr);
+                        if (isNeeded) {
+                            segment.classList.add('bg-red-500');
+                            segment.title = `${dateStr}: Needed, but missing`;
+                        } else {
+                            segment.classList.add('bg-slate-400', 'dark:bg-slate-600');
+                            segment.title = `${dateStr}: Missing (not needed)`;
+                        }
+                    }
+                } else {
+                    segment.classList.add('bg-transparent'); // Not a required date
+                }
+                fragment.appendChild(segment);
+            }
+            barTrack.appendChild(fragment);
+
+            const markersContainer = document.createElement('div');
+            markersContainer.className = 'year-markers';
+            const startYear = minDate.getFullYear();
+            const endYear = maxDate.getFullYear();
+            for (let y = startYear; y <= endYear; y++) {
+                const marker = document.createElement('span');
+                marker.className = 'year-marker';
+                marker.textContent = y;
+                markersContainer.appendChild(marker);
+            }
+
+            ratesAvailabilityGraph.append(barTrack, markersContainer);
+        }
+
+        function getRatesForDate(date) {
+            let currentDate = new Date(date);
+            for (let i = 0; i < 30; i++) {
+                const dateStr = dateToISO(currentDate);
+                if (exchangeRates[dateStr]) {
+                    return exchangeRates[dateStr];
+                }
+                currentDate.setDate(currentDate.getDate() - 1);
+            }
+            console.warn(`No exchange rate object found for ${dateToISO(date)} or the last 30 days.`);
+            return null;
+        }
+
+
+        function initializeFromUrl() {
+            if (!isInitialized) return;
+
+            const params = new URLSearchParams(window.location.search);
+
+            // Set state from URL or use defaults
+            currentView = params.get('view') || 'dashboard';
+            transactionViewFilter = params.get('filter') || null;
+
+            currencySelect.value = params.get('currency') || 'EUR_CONVERTED';
+            toggleSubcategoriesEl.checked = params.get('subcats') !== 'false';
+            
+            const allMainCats = [...new Set(allTransactions.map(t => t.mainCategory))].sort();
+            const allCombinedCats = [...new Set(allTransactions.map(t => t.combinedCategory))];
+            const defaultCategories = new Set([...allMainCats, ...allCombinedCats]);
+            const filteredCategoriesParam = params.get('categories');
+            activeCategories = filteredCategoriesParam ? new Set(decodeURIComponent(filteredCategoriesParam).split(',')) : defaultCategories;
+            
+            categoryOrder = params.get('catOrder') ? params.get('catOrder').split(',') : allMainCats;
+            
+            sortState.key = params.get('sortKey') || 'category';
+            sortState.direction = params.get('sortDir') || 'asc';
+
+            transactionTableSortState.key = params.get('tsortKey') || 'date';
+            transactionTableSortState.direction = params.get('tsortDir') || 'desc';
+
+            timeframeSelect.value = params.get('timelineRange') || '1y';
+            timelineChartTypeSelect.value = params.get('timelineType') || 'periodic';
+
+            transactionTimeframeSelect.value = params.get('tTimeframe') || 'all';
+            transactionStartDate.value = params.get('tStartDate') || '';
+            transactionEndDate.value = params.get('tEndDate') || '';
+            
+            // Comparison view state
+            const comparisonYearsParam = params.get('compYears');
+            comparisonState.years = comparisonYearsParam ? new Set(comparisonYearsParam.split(',').map(Number)) : new Set();
+            comparisonState.dataType = params.get('compType') || 'net';
+            comparisonState.viewType = params.get('compView') || 'bar';
+            comparisonDataTypeSelect.value = comparisonState.dataType;
+            comparisonToggleSubcategoriesEl.checked = params.get('compSubcats') !== 'false';
+
+            // Populate dynamic filters like years
+            populateFilters();
+            
+            // Set year and month after populating
+            yearSelect.value = params.get('year') || (yearSelect.options.length > 0 ? yearSelect.options[0].value : '');
+            monthSelect.value = params.get('month') || 'all';
+
+            // Show the main view
+            uploadSection.classList.add('hidden');
+            dashboardSection.classList.remove('hidden');
+            
+            // Trigger a full UI update based on the loaded state
+            updateDashboard(false); // false to prevent updating URL again
+        }
+        
+        function updateUrlFromState() {
+            if (!isInitialized) return;
+
+            const params = new URLSearchParams();
+            
+            params.set('view', currentView);
+            if (transactionViewFilter) {
+                params.set('filter', transactionViewFilter);
+            }
+            params.set('currency', currencySelect.value);
+            params.set('subcats', toggleSubcategoriesEl.checked);
+            
+            const allMainCats = [...new Set(allTransactions.map(t => t.mainCategory))];
+            if (categoryOrder.join(',') !== allMainCats.sort().join(',')) {
+                 params.set('catOrder', categoryOrder.join(','));
+            }
+
+            const allCats = new Set([...allMainCats, ...new Set(allTransactions.map(t => t.combinedCategory))]);
+            if (activeCategories.size !== allCats.size) {
+                params.set('categories', encodeURIComponent(Array.from(activeCategories).join(',')));
+            }
+            
+            if (currentView === 'dashboard') {
+                params.set('year', yearSelect.value);
+                params.set('month', monthSelect.value);
+            }
+            
+            params.set('sortKey', sortState.key);
+            params.set('sortDir', sortState.direction);
+            
+            params.set('tsortKey', transactionTableSortState.key);
+            params.set('tsortDir', transactionTableSortState.direction);
+
+            params.set('timelineRange', timeframeSelect.value);
+            params.set('timelineType', timelineChartTypeSelect.value);
+
+            if (currentView === 'transactions') {
+                params.set('tTimeframe', transactionTimeframeSelect.value);
+                if (transactionTimeframeSelect.value === 'custom') {
+                    params.set('tStartDate', transactionStartDate.value);
+                    params.set('tEndDate', transactionEndDate.value);
+                }
+            }
+            
+            if (currentView === 'comparison') {
+                if (comparisonState.years.size > 0) {
+                    params.set('compYears', Array.from(comparisonState.years).join(','));
+                }
+                params.set('compType', comparisonState.dataType);
+                params.set('compSubcats', comparisonToggleSubcategoriesEl.checked);
+                params.set('compView', comparisonState.viewType);
+            }
+            
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            history.pushState({path: newUrl}, '', newUrl);
+        }
+
+        function populateFilters() {
+            const years = [...new Set(allTransactions.map(t => t.date.getFullYear()))].sort((a,b) => b-a);
+            
+            // Dashboard year select
+            const currentYearVal = yearSelect.value;
+            yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            if (years.includes(parseInt(currentYearVal))) {
+                yearSelect.value = currentYearVal;
+            }
+
+            // Dashboard month select
+            const months = getTranslation('months');
+            const currentMonthVal = monthSelect.value;
+            let monthOptions = `<option value="all">${getTranslation('yearAll')}</option>`;
+            monthOptions += months.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+            monthSelect.innerHTML = monthOptions;
+            monthSelect.value = currentMonthVal;
+
+            // Comparison year selector
+            comparisonYearSelector.innerHTML = years.map(year => `
+                <div>
+                    <input type="checkbox" id="year-cb-${year}" value="${year}" class="year-checkbox" ${comparisonState.years.has(year) ? 'checked' : ''}>
+                    <label for="year-cb-${year}" class="year-checkbox-label">${year}</label>
+                </div>
+            `).join('');
+            comparisonYearSelector.querySelectorAll('.year-checkbox').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const year = parseInt(e.target.value);
+                    if (e.target.checked) {
+                        comparisonState.years.add(year);
+                    } else {
+                        comparisonState.years.delete(year);
+                    }
+                    updateDashboard();
+                });
+            });
+        }
+
+        function populateCategoryFilter() {
+            const categoryMap = allTransactions.reduce((acc, t) => {
+                const main = t.mainCategory;
+                const sub = t.combinedCategory !== main ? t.combinedCategory : null;
+                if (!acc[main]) {
+                    acc[main] = new Set();
+                }
+                if (sub) {
+                    acc[main].add(sub);
+                }
+                return acc;
+            }, {});
+
+            categoryListContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            const sortedMainCategories = Object.keys(categoryMap).sort();
+
+            // Helper to create a valid HTML ID from a string
+            const createSafeId = (str) => `cat-filter-${str.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+            sortedMainCategories.forEach(mainCat => {
+                const mainCatDiv = document.createElement('div');
+                mainCatDiv.className = 'space-y-2';
+
+                const mainCheckboxContainer = document.createElement('div');
+                mainCheckboxContainer.className = 'flex items-center';
+                
+                const mainCheckbox = document.createElement('input');
+                const mainCatId = createSafeId(mainCat);
+                mainCheckbox.type = 'checkbox';
+                mainCheckbox.id = mainCatId;
+                mainCheckbox.value = mainCat;
+                mainCheckbox.className = 'h-4 w-4 text-indigo-600 border-slate-300 dark:border-slate-600 rounded focus:ring-indigo-500';
+                mainCheckbox.dataset.isMain = true;
+
+                const mainLabel = document.createElement('label');
+                mainLabel.htmlFor = mainCatId;
+                mainLabel.textContent = mainCat;
+                mainLabel.className = 'ml-3 font-semibold text-sm text-slate-800 dark:text-slate-200';
+                
+                mainCheckboxContainer.append(mainCheckbox, mainLabel);
+                mainCatDiv.appendChild(mainCheckboxContainer);
+                
+                const subCats = [...categoryMap[mainCat]].sort();
+
+                if (subCats.length > 0) {
+                    const subCatContainer = document.createElement('div');
+                    subCatContainer.className = 'pl-6 space-y-2';
+
+                    subCats.forEach(subCat => {
+                        const subCheckboxContainer = document.createElement('div');
+                        subCheckboxContainer.className = 'flex items-center';
+
+                        const subCheckbox = document.createElement('input');
+                        const subCatId = createSafeId(subCat);
+                        subCheckbox.type = 'checkbox';
+                        subCheckbox.id = subCatId;
+                        subCheckbox.value = subCat;
+                        subCheckbox.className = 'h-4 w-4 text-indigo-600 border-slate-300 dark:border-slate-600 rounded focus:ring-indigo-500';
+                        subCheckbox.dataset.main = mainCat;
+
+                        const subLabel = document.createElement('label');
+                        subLabel.htmlFor = subCatId;
+                        const subCatParts = subCat.split(' / ');
+                        // Display only the last part of the combined category name
+                        subLabel.textContent = subCatParts[subCatParts.length - 1];
+                        subLabel.className = 'ml-3 text-sm text-slate-700 dark:text-slate-300';
+                        
+                        subCheckboxContainer.append(subCheckbox, subLabel);
+                        subCatContainer.appendChild(subCheckboxContainer);
+                    });
+                    mainCatDiv.appendChild(subCatContainer);
+                }
+                fragment.appendChild(mainCatDiv);
+            });
+
+            categoryListContainer.appendChild(fragment);
+            
+            // Set initial checked state for sub-categories first
+            categoryListContainer.querySelectorAll('input[data-main]').forEach(subCb => {
+                subCb.checked = activeCategories.has(subCb.value);
+                subCb.addEventListener('change', () => {
+                    const mainCat = subCb.dataset.main;
+                    const mainCheckbox = categoryListContainer.querySelector(`input[value="${mainCat}"][data-is-main="true"]`);
+                    if (mainCheckbox) {
+                        updateParentCheckbox(mainCheckbox);
+                    }
+                });
+            });
+
+            // Then, derive and set the state for main categories
+            categoryListContainer.querySelectorAll('input[data-is-main="true"]').forEach(mainCb => {
+                mainCb.addEventListener('change', (e) => {
+                    const mainCat = e.target.value;
+                    categoryListContainer.querySelectorAll(`input[data-main="${mainCat}"]`).forEach(subCb => {
+                        subCb.checked = e.target.checked;
+                    });
+                });
+                updateParentCheckbox(mainCb);
+            });
+        }
+        
+        function updateParentCheckbox(mainCheckbox) {
+            const mainCat = mainCheckbox.value;
+            const subCheckboxes = Array.from(categoryListContainer.querySelectorAll(`input[data-main="${mainCat}"]`));
+            if (subCheckboxes.length === 0) {
+                // If it's a main category with no subs, its state is independent
+                mainCheckbox.checked = activeCategories.has(mainCheckbox.value);
+                mainCheckbox.indeterminate = false;
+                return;
+            };
+
+            const checkedCount = subCheckboxes.filter(cb => cb.checked).length;
+            
+            if (checkedCount === 0) {
+                mainCheckbox.checked = false;
+                mainCheckbox.indeterminate = false;
+            } else if (checkedCount === subCheckboxes.length) {
+                mainCheckbox.checked = true;
+                mainCheckbox.indeterminate = false;
+            } else {
+                mainCheckbox.checked = false;
+                mainCheckbox.indeterminate = true;
+            }
+        }
+
+        function getConvertedAmount(transaction) {
+            const displayCurrencySetting = currencySelect.value;
+            const rates = getRatesForDate(transaction.date);
+
+            if (!rates) return 0; // No rates found for this date or recent past
+
+            if (displayCurrencySetting === 'EUR_CONVERTED') {
+                if (transaction.currency === 'JPY') {
+                    return (rates && rates.jpy) ? transaction.amount / rates.jpy : 0;
+                }
+                return transaction.amount; // Already in EUR
+            } else if (displayCurrencySetting === 'JPY_CONVERTED') {
+                 if (transaction.currency === 'EUR') {
+                    return (rates && rates.jpy) ? transaction.amount * rates.jpy : 0;
+                }
+                return transaction.amount; // Already in JPY
+            }
+            
+            return transaction.amount; // For "Nur EUR" or "Nur JPY"
+        }
+
+        // --- Main Update Router ---
+        function updateDashboard(shouldUpdateUrl = true) {
+            if (!isInitialized) return;
+            
+            // Update active view
+            viewContainers.forEach(c => c.classList.add('hidden'));
+            const viewElement = document.getElementById(`${currentView}-view`);
+            if (viewElement) {
+                viewElement.classList.remove('hidden');
+            }
+
+            viewButtons.forEach(b => {
+                b.classList.toggle('active', b.dataset.view === currentView);
+            });
+
+            // Update content based on view
+            if (currentView === 'dashboard') {
+                updateDashboardView();
+            } else if (currentView === 'timeline') {
+                updateTimelineView();
+            } else if (currentView === 'comparison') {
+                updateComparisonView();
+            } else if (currentView === 'transactions') {
+                updateTransactionTableView();
+            }
+
+            if (shouldUpdateUrl) {
+                updateUrlFromState();
+            }
+        }
+
+        // --- View Specific Update Functions ---
+        function updateDashboardView() {
+            const selectedYear = parseInt(yearSelect.value);
+            const selectedMonth = monthSelect.value;
+            const showSubcategories = toggleSubcategoriesEl.checked;
+            const displayCurrencySetting = currencySelect.value;
+            
+            const filteredTransactions = allTransactions.filter(t => {
+                const transactionYear = t.date.getFullYear();
+                if (transactionYear !== selectedYear) return false;
+                if (selectedMonth !== 'all' && t.date.getMonth() !== parseInt(selectedMonth)) return false;
+                
+                if (displayCurrencySetting === 'EUR' && t.currency !== 'EUR') return false;
+                if (displayCurrencySetting === 'JPY' && t.currency !== 'JPY') return false;
+
+                const isVisible = activeCategories.has(t.combinedCategory) || activeCategories.has(t.mainCategory);
+                if (!isVisible) return false;
+
+                return true;
+            }).sort((a, b) => b.date - a.date);
+            
+            const displayTransactions = filteredTransactions.map(t => {
+                let finalCurrency;
+                if (displayCurrencySetting.includes('EUR')) {
+                    finalCurrency = 'EUR';
+                } else if (displayCurrencySetting.includes('JPY')) {
+                    finalCurrency = 'JPY';
+                }
+
+                return {
+                    ...t,
+                    displayCategory: showSubcategories ? t.combinedCategory : t.mainCategory,
+                    displayAmount: getConvertedAmount(t),
+                    displayCurrency: finalCurrency
+                };
+            });
+
+            updateSummary(displayTransactions);
+            updateExpenseChart(displayTransactions);
+            updateTransactionList(displayTransactions);
+            updateDetailedCategoryView(displayTransactions);
+        }
+
+        function updateTimelineView() {
+            const displayCurrencySetting = currencySelect.value;
+            
+            const allTransactionsForView = allTransactions.filter(t => {
+                if (displayCurrencySetting === 'EUR' && t.currency !== 'EUR') return false;
+                if (displayCurrencySetting === 'JPY' && t.currency !== 'JPY') return false;
+                return true;
+            });
+            
+            const filteredTransactionsForView = allTransactionsForView.filter(t => {
+                return activeCategories.has(t.combinedCategory) || activeCategories.has(t.mainCategory);
+            });
+
+            updateTimelineChart(filteredTransactionsForView);
+            updateTotalTimelineChart(allTransactionsForView);
+        }
+        
+        function updateComparisonView() {
+            const showSubcategories = comparisonToggleSubcategoriesEl.checked;
+            const displayCurrencySetting = currencySelect.value;
+            
+            const filteredTransactions = allTransactions.filter(t => {
+                if (displayCurrencySetting === 'EUR' && t.currency !== 'EUR') return false;
+                if (displayCurrencySetting === 'JPY' && t.currency !== 'JPY') return false;
+                
+                if (!comparisonState.years.has(t.date.getFullYear())) return false;
+
+                const isVisible = activeCategories.has(t.combinedCategory) || activeCategories.has(t.mainCategory);
+                return isVisible;
+            });
+
+            const displayTransactions = filteredTransactions.map(t => {
+                let finalCurrency;
+                if (displayCurrencySetting.includes('EUR')) finalCurrency = 'EUR';
+                else if (displayCurrencySetting.includes('JPY')) finalCurrency = 'JPY';
+                return {
+                    ...t,
+                    displayCategory: showSubcategories ? t.combinedCategory : t.mainCategory,
+                    displayAmount: getConvertedAmount(t),
+                    displayCurrency: finalCurrency
+                };
+            });
+            
+            const notEnoughData = comparisonState.years.size < 2;
+
+            // Toggle visibility of containers
+            noComparisonDataEl.classList.toggle('hidden', !notEnoughData);
+            comparisonDeviationChartContainer.classList.toggle('hidden', notEnoughData);
+            noComparisonDeviationDataEl.classList.toggle('hidden', !notEnoughData);
+            comparisonChartContainer.classList.toggle('hidden', notEnoughData || comparisonState.viewType !== 'bar');
+            comparisonPieChartsContainer.classList.toggle('hidden', notEnoughData || comparisonState.viewType !== 'pie');
+
+            // If not enough data, destroy charts and return
+            if (notEnoughData) {
+                if (comparisonChart) { comparisonChart.destroy(); comparisonChart = null; }
+                comparisonPieCharts.forEach(c => c.destroy());
+                comparisonPieCharts = [];
+                if (comparisonDeviationChart) { comparisonDeviationChart.destroy(); comparisonDeviationChart = null; }
+                return;
+            }
+
+            // Update the correct view
+            if (comparisonState.viewType === 'bar') {
+                updateComparisonChart(displayTransactions);
+            } else {
+                updateComparisonPieCharts(displayTransactions);
+            }
+            
+            updateComparisonDeviationChart(displayTransactions);
+        }
+
+        function updateSummary(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+
+            const income = transactions.filter(t => t.displayAmount > 0).reduce((sum, t) => sum + t.displayAmount, 0);
+            const expenses = transactions.filter(t => t.displayAmount < 0).reduce((sum, t) => sum + t.displayAmount, 0);
+            const net = income + expenses;
+
+            totalIncomeEl.textContent = currencyFormatter.format(income);
+            totalExpensesEl.textContent = currencyFormatter.format(Math.abs(expenses));
+            netSavingsEl.textContent = currencyFormatter.format(net);
+            
+            netSavingsEl.classList.toggle('text-red-600', net < 0);
+            netSavingsEl.classList.toggle('dark:text-red-400', net < 0);
+            netSavingsEl.classList.toggle('text-slate-800', net >= 0);
+            netSavingsEl.classList.toggle('dark:text-slate-200', net >= 0);
+        }
+
+        function updateExpenseChart(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+
+            const expensesByCategory = transactions
+                .filter(t => t.displayAmount < 0)
+                .reduce((acc, t) => {
+                    const category = t.displayCategory || getTranslation('uncategorized');
+                    acc[category] = (acc[category] || 0) + Math.abs(t.displayAmount);
+                    return acc;
+                }, {});
+            
+            const labels = Object.keys(expensesByCategory);
+            const data = Object.values(expensesByCategory);
+
+            if (data.length === 0) {
+                chartContainer.classList.add('hidden');
+                noChartDataEl.classList.remove('hidden');
+                return;
+            }
+            
+            chartContainer.classList.remove('hidden');
+            noChartDataEl.classList.add('hidden');
+
+            const chartData = {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: labels.map((_, i) => categoryColors[i % categoryColors.length]),
+                    hoverOffset: 4,
+                    borderColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff' // slate-800 or white
+                }]
+            };
+
+            if (expenseChart) {
+                expenseChart.data = chartData;
+                expenseChart.options.plugins.tooltip.callbacks.label = (context) => currencyFormatter.format(context.parsed);
+                expenseChart.update();
+            } else {
+                expenseChart = new Chart(expenseChartCanvas, {
+                    type: 'doughnut',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 20
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => currencyFormatter.format(context.parsed)
+                                }
+                            },
+                            datalabels: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateTransactionList(transactions) {
+            transactionListEl.innerHTML = '';
+
+            if (transactions.length === 0) {
+                transactionListEl.classList.add('hidden');
+                noTransactionsEl.classList.remove('hidden');
+                return;
+            }
+            
+            transactionListEl.classList.remove('hidden');
+            noTransactionsEl.classList.add('hidden');
+
+            const fragment = document.createDocumentFragment();
+            const dateFormatter = formatters[currentLang].date;
+
+            transactions.forEach(t => {
+                const currencyFormatter = formatters[currentLang][t.displayCurrency];
+                const container = document.createElement('div');
+                container.className = 'flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3 last:border-b-0';
+
+                const leftSide = document.createElement('div');
+                leftSide.className = 'flex items-center space-x-3 overflow-hidden';
+
+                const iconContainer = document.createElement('div');
+                iconContainer.className = `p-2 rounded-full ${t.displayAmount > 0 ? 'bg-green-100 dark:bg-green-900/50' : 'bg-red-100 dark:bg-red-900/50'}`;
+                iconContainer.innerHTML = `<svg class="h-5 w-5 ${t.displayAmount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${t.displayAmount > 0 ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3'}" /></svg>`;
+                
+                const textContainer = document.createElement('div');
+                textContainer.className = 'flex-1 min-w-0';
+
+                const descriptionP = document.createElement('p');
+                descriptionP.className = 'font-semibold text-slate-700 dark:text-slate-200 truncate';
+                descriptionP.title = t.description;
+                descriptionP.textContent = t.description;
+
+                const categoryP = document.createElement('p');
+                categoryP.className = 'text-sm text-slate-500 dark:text-slate-400';
+                categoryP.textContent = `${t.displayCategory} · ${dateFormatter.format(t.date)}`;
+                
+                textContainer.append(descriptionP, categoryP);
+                leftSide.append(iconContainer, textContainer);
+
+                const amountP = document.createElement('p');
+                amountP.className = `font-bold whitespace-nowrap ${t.displayAmount > 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-800 dark:text-slate-200'}`;
+                amountP.textContent = currencyFormatter.format(t.displayAmount);
+                
+                container.append(leftSide, amountP);
+                fragment.appendChild(container);
+            });
+
+            transactionListEl.appendChild(fragment);
+        }
+        
+        function updateDetailedCategoryView(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+
+            const breakdown = transactions.reduce((acc, t) => {
+                const { mainCategory, combinedCategory, displayAmount } = t;
+                
+                if (!acc[mainCategory]) {
+                    acc[mainCategory] = { income: 0, expense: 0, subs: {} };
+                }
+
+                if (displayAmount > 0) acc[mainCategory].income += displayAmount;
+                else acc[mainCategory].expense += displayAmount;
+                
+                if (mainCategory !== combinedCategory) {
+                     if (!acc[mainCategory].subs[combinedCategory]) {
+                        acc[mainCategory].subs[combinedCategory] = { income: 0, expense: 0 };
+                     }
+                     if (displayAmount > 0) acc[mainCategory].subs[combinedCategory].income += displayAmount;
+                     else acc[mainCategory].subs[combinedCategory].expense += displayAmount;
+                }
+                return acc;
+            }, {});
+
+            let displayOrder = [...categoryOrder];
+
+            if (sortState.key !== 'manual') {
+                const key = sortState.key;
+                const dir = sortState.direction === 'asc' ? 1 : -1;
+                
+                displayOrder.sort((a, b) => {
+                    if (key === 'category') {
+                        return a.localeCompare(b) * dir;
+                    }
+                    
+                    const dataA = breakdown[a] || { income: 0, expense: 0 };
+                    const dataB = breakdown[b] || { income: 0, expense: 0 };
+
+                    let valA, valB;
+                    switch (key) {
+                        case 'income': valA = dataA.income; valB = dataB.income; break;
+                        case 'expense': valA = dataA.expense; valB = dataB.expense; break;
+                        case 'net': valA = dataA.income + dataA.expense; valB = dataB.income + dataB.expense; break;
+                        default: valA = 0; valB = 0;
+                    }
+                    
+                    return (valA - valB) * dir;
+                });
+            }
+            
+            sortableHeaders.forEach(header => {
+                header.classList.remove('asc', 'desc');
+                if (header.dataset.sortKey === sortState.key) {
+                    header.classList.add(sortState.direction);
+                }
+            });
+            
+            detailedCategoryTbody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            displayOrder.forEach(mainCat => {
+                if (!breakdown[mainCat]) return;
+
+                const mainData = breakdown[mainCat];
+                const mainNet = mainData.income + mainData.expense;
+                const hasSubs = Object.keys(mainData.subs).length > 0;
+
+                const mainRow = document.createElement('tr');
+                mainRow.draggable = true;
+                mainRow.dataset.mainCategory = mainCat;
+                mainRow.classList.add('main-row');
+                let mainRowColorClass = mainNet > 0 ? 'bg-green-50/50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30' : mainNet < 0 ? 'bg-red-50/50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+                mainRow.className = `border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200 ${mainRowColorClass}`;
+
+                if (hasSubs) mainRow.classList.add('expand-row');
+
+                mainRow.innerHTML = `
+                    <td class="px-6 py-4 flex items-center">
+                        ${hasSubs ? '<svg class="h-4 w-4 mr-2 text-slate-400 expand-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>' : '<span class="w-6 mr-2"></span>'}
+                        ${mainCat}
+                    </td>
+                    <td class="px-6 py-4 text-right text-green-600 dark:text-green-400">${currencyFormatter.format(mainData.income)}</td>
+                    <td class="px-6 py-4 text-right text-red-600 dark:text-red-400">${currencyFormatter.format(Math.abs(mainData.expense))}</td>
+                    <td class="px-6 py-4 text-right ${mainNet < 0 ? 'text-red-600 dark:text-red-400' : ''}">${currencyFormatter.format(mainNet)}</td>
+                `;
+                fragment.appendChild(mainRow);
+
+                if (hasSubs) {
+                    let subCatKeys = Object.keys(mainData.subs);
+
+                    if (sortState.key !== 'category' && sortState.key !== 'manual') {
+                        const key = sortState.key;
+                        const dir = sortState.direction === 'asc' ? 1 : -1;
+                        
+                        subCatKeys.sort((a, b) => {
+                            const subDataA = mainData.subs[a] || { income: 0, expense: 0 };
+                            const subDataB = mainData.subs[b] || { income: 0, expense: 0 };
+                            
+                            let valA, valB;
+                            switch (key) {
+                                case 'income': valA = subDataA.income; valB = subDataB.income; break;
+                                case 'expense': valA = subDataA.expense; valB = subDataB.expense; break;
+                                case 'net': valA = subDataA.income + subDataA.expense; valB = subDataB.income + subDataB.expense; break;
+                                default: valA = 0; valB = 0;
+                            }
+                            return (valA - valB) * dir;
+                        });
+                    } else {
+                        subCatKeys.sort((a, b) => a.localeCompare(b));
+                    }
+                    
+                    subCatKeys.forEach(subCatKey => {
+                        const subData = mainData.subs[subCatKey];
+                        const subNet = subData.income + subData.expense;
+                        const subRow = document.createElement('tr');
+                        
+                        let subRowColorClass = 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+                        subRow.className = `border-b dark:border-slate-700/50 hidden sub-row ${subRowColorClass}`;
+                        subRow.dataset.parentCategory = mainCat;
+                        
+                        subRow.innerHTML = `
+                            <td class="pl-12 pr-6 py-4 text-slate-600 dark:text-slate-400">${subCatKey.split(' / ')[1]}</td>
+                            <td class="px-6 py-4 text-right text-green-600 dark:text-green-400">${currencyFormatter.format(subData.income)}</td>
+                            <td class="px-6 py-4 text-right text-red-600 dark:text-red-400">${currencyFormatter.format(Math.abs(subData.expense))}</td>
+                            <td class="px-6 py-4 text-right ${subNet < 0 ? 'text-red-600 dark:text-red-400' : ''}">${currencyFormatter.format(subNet)}</td>
+                        `;
+                        fragment.appendChild(subRow);
+                    });
+                }
+            });
+
+            detailedCategoryTbody.appendChild(fragment);
+        }
+
+        // --- Helper function to get timeline configuration ---
+        function getTimelineConfig() {
+            if (allTransactions.length === 0) return null;
+
+            const firstDate = allTransactions.reduce((min, t) => t.date < min ? t.date : min, new Date());
+            const lastDate = allTransactions.reduce((max, t) => t.date > max ? t.date : max, new Date(0));
+            
+            const timeframe = timeframeSelect.value;
+            let startDate = new Date(lastDate);
+            let timeConfig = { unit: 'month', stepSize: 1 };
+
+            switch (timeframe) {
+                case '1m': startDate.setMonth(startDate.getMonth() - 1); timeConfig = { unit: 'week', stepSize: 1 }; break;
+                case '6m': startDate.setMonth(startDate.getMonth() - 6); timeConfig = { unit: 'month', stepSize: 1 }; break;
+                case '1y': startDate.setFullYear(startDate.getFullYear() - 1); timeConfig = { unit: 'month', stepSize: 1 }; break;
+                case '2y': startDate.setFullYear(startDate.getFullYear() - 2); timeConfig = { unit: 'quarter', stepSize: 1 }; break;
+                case '3y': startDate.setFullYear(startDate.getFullYear() - 3); timeConfig = { unit: 'quarter', stepSize: 1 }; break;
+                case '5y': startDate.setFullYear(startDate.getFullYear() - 5); timeConfig = { unit: 'year', stepSize: 1 }; break;
+                case '10y': startDate.setFullYear(startDate.getFullYear() - 10); timeConfig = { unit: 'year', stepSize: 1 }; break;
+                case 'max': 
+                    startDate = new Date(firstDate);
+                    const diffYears = (lastDate - startDate) / (1000 * 60 * 60 * 24 * 365);
+                    if (diffYears > 10) timeConfig = { unit: 'year', stepSize: 1 };
+                    else if (diffYears > 3) timeConfig = { unit: 'quarter', stepSize: 1 };
+                    else timeConfig = { unit: 'month', stepSize: 1 };
+                    break;
+            }
+
+            const datePoints = [];
+            let currentDate = new Date(startDate);
+            while (currentDate <= lastDate) {
+                datePoints.push(new Date(currentDate));
+                 switch (timeConfig.unit) {
+                    case 'week': currentDate.setDate(currentDate.getDate() + 7); break;
+                    case 'month': currentDate.setMonth(currentDate.getMonth() + 1); break;
+                    case 'quarter': currentDate.setMonth(currentDate.getMonth() + 3); break;
+                    case 'year': currentDate.setFullYear(currentDate.getFullYear() + 1); break;
+                }
+            }
+            if (datePoints.length > 0 && datePoints[datePoints.length - 1] < lastDate) {
+                datePoints.push(new Date(lastDate));
+            }
+            
+            return { startDate, lastDate, timeConfig, datePoints };
+        }
+
+        function updateTimelineChart(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const timelineChartType = timelineChartTypeSelect.value;
+            const config = getTimelineConfig();
+
+            if (!config) return;
+            const { startDate, timeConfig, datePoints } = config;
+            
+            const mainCatsInFilter = [...new Set(transactions.map(t => t.mainCategory))].sort();
+            const categoryBalances = {};
+            
+            mainCatsInFilter.forEach(cat => {
+                categoryBalances[cat] = [];
+            });
+
+            if (timelineChartType === 'cumulative') {
+                const startingBalances = {};
+                mainCatsInFilter.forEach(cat => startingBalances[cat] = 0);
+                transactions.filter(t => t.date < startDate).forEach(t => {
+                    if(startingBalances[t.mainCategory] !== undefined) {
+                       startingBalances[t.mainCategory] += getConvertedAmount(t);
+                    }
+                });
+
+                mainCatsInFilter.forEach(cat => {
+                    let currentBalance = startingBalances[cat];
+                    datePoints.forEach((datePoint, i) => {
+                        const periodStart = i > 0 ? datePoints[i - 1] : startDate;
+                        const periodEnd = datePoint;
+                        
+                        const periodChange = transactions
+                            .filter(t => t.mainCategory === cat && t.date >= periodStart && t.date < periodEnd)
+                            .reduce((sum, t) => sum + getConvertedAmount(t), 0);
+                        
+                        currentBalance += periodChange;
+                        categoryBalances[cat].push({ x: datePoint.getTime(), y: currentBalance });
+                    });
+                });
+            } else { // periodic
+                 datePoints.forEach((datePoint, i) => {
+                    const periodStart = i > 0 ? datePoints[i - 1] : startDate;
+                    const periodEnd = datePoint;
+                    
+                    mainCatsInFilter.forEach(cat => {
+                        const periodChange = transactions
+                            .filter(t => t.mainCategory === cat && t.date >= periodStart && t.date < periodEnd)
+                            .reduce((sum, t) => sum + getConvertedAmount(t), 0);
+                        
+                        categoryBalances[cat].push({ x: datePoint.getTime(), y: periodChange });
+                    });
+                });
+            }
+            
+            const datasets = mainCatsInFilter.map((cat, index) => {
+                const color = categoryColors[index % categoryColors.length];
+                return {
+                    label: cat,
+                    data: categoryBalances[cat],
+                    fill: true,
+                    borderColor: color,
+                    backgroundColor: `${color}66`, // Add alpha for fill
+                    tension: 0.1,
+                    pointRadius: 0,
+                    hidden: timelineCategoryVisibility[cat] === false,
+                }
+            });
+
+            const chartData = { datasets };
+            const chartConfig = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            // The locale configuration was removed because the date-fns locale files
+                            // are not compatible with direct browser <script> tag loading,
+                            // which caused the application to crash. The chart will now
+                            // default to the en-US locale for date formatting on the axis.
+                            time: {
+                                unit: timeConfig.unit,
+                                stepSize: timeConfig.stepSize,
+                                tooltipFormat: 'dd.MM.yyyy',
+                                displayFormats: {
+                                    week: 'dd.MM.yy', month: 'MMM yy', quarter: 'QQQ yy', year: 'yyyy'
+                                }
+                            },
+                            grid: {
+                                color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            ticks: { callback: (value) => currencyFormatter.format(value) },
+                            grid: {
+                                color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { 
+                            display: true, 
+                            position: 'bottom',
+                            onClick: (e, legendItem, legend) => {
+                                const index = legendItem.datasetIndex;
+                                const ci = legend.chart;
+                                const isVisible = ci.isDatasetVisible(index);
+                                ci.setDatasetVisibility(index, !isVisible);
+                                timelineCategoryVisibility[legendItem.text] = !isVisible;
+                                ci.update();
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: (context) => `${context.dataset.label}: ${currencyFormatter.format(context.parsed.y)}`
+                            }
+                        },
+                        datalabels: {
+                            display: false
+                        }
+                    },
+                    interaction: { mode: 'index', intersect: false },
+                }
+            };
+            
+            if (timelineChart) {
+                timelineChart.data = chartData;
+                timelineChart.options = chartConfig.options;
+                timelineChart.update();
+            } else {
+                timelineChart = new Chart(timelineChartCanvas, chartConfig);
+            }
+        }
+        
+        function updateTotalTimelineChart(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const timelineChartType = timelineChartTypeSelect.value;
+            const config = getTimelineConfig();
+
+            if (!config) return;
+            const { startDate, timeConfig, datePoints } = config;
+
+            let totalNetData = [];
+
+            if (timelineChartType === 'cumulative') {
+                let currentBalance = transactions
+                    .filter(t => t.date < startDate)
+                    .reduce((sum, t) => sum + getConvertedAmount(t), 0);
+                
+                totalNetData.push({ x: startDate.getTime(), y: currentBalance });
+
+                datePoints.forEach((datePoint, i) => {
+                    const periodStart = i > 0 ? datePoints[i - 1] : startDate;
+                    const periodEnd = datePoint;
+                    
+                    const periodChange = transactions
+                        .filter(t => t.date >= periodStart && t.date < periodEnd)
+                        .reduce((sum, t) => sum + getConvertedAmount(t), 0);
+                    
+                    currentBalance += periodChange;
+                    totalNetData.push({ x: datePoint.getTime(), y: currentBalance });
+                });
+
+            } else { // periodic
+                datePoints.forEach((datePoint, i) => {
+                    const periodStart = i > 0 ? datePoints[i - 1] : startDate;
+                    const periodEnd = datePoint;
+                    
+                    const periodChange = transactions
+                        .filter(t => t.date >= periodStart && t.date < periodEnd)
+                        .reduce((sum, t) => sum + getConvertedAmount(t), 0);
+                    
+                    totalNetData.push({ x: datePoint.getTime(), y: periodChange });
+                });
+            }
+
+            const chartData = {
+                datasets: [{
+                    label: getTranslation('totalNetTimeline'),
+                    data: totalNetData,
+                    borderColor: '#60a5fa', // blue-400
+                    backgroundColor: document.documentElement.classList.contains('dark') ? '#1e3a8a' : '#dbeafe', // blue-900 or blue-100
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 1,
+                    pointHoverRadius: 5
+                }]
+            };
+
+            const chartConfig = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            // The locale configuration was removed because the date-fns locale files
+                            // are not compatible with direct browser <script> tag loading,
+                            // which caused the application to crash. The chart will now
+                            // default to the en-US locale for date formatting on the axis.
+                            time: {
+                                unit: timeConfig.unit,
+                                stepSize: timeConfig.stepSize,
+                                tooltipFormat: 'dd.MM.yyyy',
+                                displayFormats: {
+                                    week: 'dd.MM.yy', month: 'MMM yy', quarter: 'QQQ yy', year: 'yyyy'
+                                }
+                            },
+                             grid: {
+                                color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        y: {
+                            ticks: { callback: (value) => currencyFormatter.format(value) },
+                             grid: {
+                                color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: (context) => `${getTranslation('net')}: ${currencyFormatter.format(context.parsed.y)}`
+                            }
+                        },
+                        datalabels: {
+                            display: false
+                        }
+                    },
+                    interaction: { mode: 'index', intersect: false },
+                }
+            };
+
+            if (totalTimelineChart) {
+                totalTimelineChart.data = chartData;
+                totalTimelineChart.options = chartConfig.options;
+                totalTimelineChart.update();
+            } else {
+                totalTimelineChart = new Chart(totalTimelineChartCanvas, chartConfig);
+            }
+        }
+
+        function updateTransactionTableView() {
+            clearTransactionFilterBtn.classList.toggle('hidden', !transactionViewFilter);
+
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const dateFormatter = formatters[currentLang].date;
+            
+            // 1. Filter by currency and category
+            let filtered = allTransactions.filter(t => {
+                const displayCurrencySetting = currencySelect.value;
+                if (displayCurrencySetting === 'EUR' && t.currency !== 'EUR') return false;
+                if (displayCurrencySetting === 'JPY' && t.currency !== 'JPY') return false;
+
+                return activeCategories.has(t.combinedCategory) || activeCategories.has(t.mainCategory);
+            });
+
+            // 2. Filter by special view filter (e.g., uncategorized)
+            if (transactionViewFilter === 'uncategorized') {
+                filtered = filtered.filter(t => t.mainCategory === getTranslation('uncategorized'));
+            }
+
+            // 3. Filter by time
+            const timeFrameSelection = transactionTimeframeSelect.value;
+            if (timeFrameSelection === 'timeline') {
+                const config = getTimelineConfig();
+                if (config) {
+                    const { startDate, lastDate } = config;
+                    filtered = filtered.filter(t => t.date >= startDate && t.date <= lastDate);
+                }
+            } else if (timeFrameSelection === 'custom') {
+                const startDate = transactionStartDate.valueAsDate;
+                const endDate = transactionEndDate.valueAsDate;
+                if (startDate) {
+                    filtered = filtered.filter(t => t.date >= startDate);
+                }
+                if (endDate) {
+                    // Add one day to the end date to make it inclusive
+                    const inclusiveEndDate = new Date(endDate.getTime());
+                    inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
+                    filtered = filtered.filter(t => t.date < inclusiveEndDate);
+                }
+            }
+            // if 'all', no time filtering is needed
+
+            // 4. Sort
+            const key = transactionTableSortState.key;
+            const dir = transactionTableSortState.direction === 'asc' ? 1 : -1;
+            filtered.sort((a, b) => {
+                let valA, valB;
+                if (key === 'date') {
+                    valA = a.date.getTime();
+                    valB = b.date.getTime();
+                } else if (key === 'amount') {
+                    valA = getConvertedAmount(a);
+                    valB = getConvertedAmount(b);
+                } else if (key === 'description' || key === 'accountName') {
+                    valA = a[key].toLowerCase();
+                    valB = b[key].toLowerCase();
+                } else if (key === 'category') {
+                     valA = a.combinedCategory.toLowerCase();
+                     valB = b.combinedCategory.toLowerCase();
+                }
+                
+                if (valA < valB) return -1 * dir;
+                if (valA > valB) return 1 * dir;
+                return 0;
+            });
+
+            // Update sort icons
+            transactionSortableHeaders.forEach(header => {
+                header.classList.remove('asc', 'desc');
+                if (header.dataset.sortKey === key) {
+                    header.classList.add(transactionTableSortState.direction);
+                }
+            });
+
+            if (filtered.length === 0) {
+                transactionTableTbody.innerHTML = '';
+                noTimelineTransactions.classList.remove('hidden');
+                return;
+            }
+
+            noTimelineTransactions.classList.add('hidden');
+            transactionTableTbody.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            filtered.forEach(t => {
+                const row = document.createElement('tr');
+                const displayAmount = getConvertedAmount(t);
+                row.className = 'border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50';
+                row.innerHTML = `
+                    <td class="px-6 py-4">${dateFormatter.format(t.date)}</td>
+                    <td class="px-6 py-4 text-slate-800 dark:text-slate-200 font-medium">${t.description}</td>
+                    <td class="px-6 py-4">${t.combinedCategory}</td>
+                    <td class="px-6 py-4">${t.accountName}</td>
+                    <td class="px-6 py-4 text-right font-medium ${displayAmount < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">
+                        ${currencyFormatter.format(displayAmount)}
+                    </td>
+                `;
+                fragment.appendChild(row);
+            });
+            transactionTableTbody.appendChild(fragment);
+        }
+        
+        function updateComparisonChart(transactions) {
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const dataType = comparisonState.dataType;
+
+            const datasets = [];
+            const sortedYears = [...comparisonState.years].sort();
+
+            sortedYears.forEach((year, index) => {
+                const yearData = new Array(12).fill(0);
+                const yearTransactions = transactions.filter(t => t.date.getFullYear() === year);
+
+                yearTransactions.forEach(t => {
+                    const month = t.date.getMonth();
+                    let value = 0;
+                    if (dataType === 'net') {
+                        value = t.displayAmount;
+                    } else if (dataType === 'income' && t.displayAmount > 0) {
+                        value = t.displayAmount;
+                    } else if (dataType === 'expenses' && t.displayAmount < 0) {
+                        value = Math.abs(t.displayAmount);
+                    }
+                    yearData[month] += value;
+                });
+                
+                const color = categoryColors[index % categoryColors.length];
+                datasets.push({
+                    label: year.toString(),
+                    data: yearData,
+                    borderColor: color,
+                    backgroundColor: `${color}33`,
+                    fill: false,
+                    tension: 0.1
+                });
+            });
+            
+            const chartData = {
+                labels: getTranslation('months'),
+                datasets: datasets
+            };
+
+            const chartConfig = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            ticks: { callback: value => currencyFormatter.format(value) }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: (context) => `${context.dataset.label}: ${currencyFormatter.format(context.parsed.y)}`
+                            }
+                        },
+                        datalabels: {
+                            display: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            };
+            
+            if (comparisonChart) {
+                comparisonChart.data = chartData;
+                comparisonChart.options = chartConfig.options;
+                comparisonChart.update();
+            } else {
+                comparisonChart = new Chart(comparisonChartCanvas, chartConfig);
+            }
+        }
+
+        function updateComparisonPieCharts(transactions) {
+            // 1. Cleanup old charts
+            comparisonPieCharts.forEach(c => c.destroy());
+            comparisonPieCharts = [];
+            comparisonPieChartsContainer.innerHTML = '';
+
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const dataType = comparisonState.dataType;
+            const sortedYears = [...comparisonState.years].sort();
+
+            // 2. Create a consistent color map for all categories across all selected years
+            const allCategories = [...new Set(transactions.map(t => t.displayCategory))].sort();
+            const colorMap = {};
+            allCategories.forEach((cat, i) => {
+                colorMap[cat] = categoryColors[i % categoryColors.length];
+            });
+
+            // 3. Create a pie chart for each year
+            sortedYears.forEach(year => {
+                // Aggregate data for this year
+                const yearTransactions = transactions.filter(t => t.date.getFullYear() === year);
+                const categoryTotals = {};
+
+                yearTransactions.forEach(t => {
+                    const category = t.displayCategory;
+                    if (!categoryTotals[category]) {
+                        categoryTotals[category] = 0;
+                    }
+                    let value = 0;
+                    if (dataType === 'net') {
+                        // For pie charts, 'net' is ambiguous. We'll show absolute expenses.
+                        if (t.displayAmount < 0) value = Math.abs(t.displayAmount);
+                    } else if (dataType === 'income' && t.displayAmount > 0) {
+                        value = t.displayAmount;
+                    } else if (dataType === 'expenses' && t.displayAmount < 0) {
+                        value = Math.abs(t.displayAmount);
+                    }
+                    categoryTotals[category] += value;
+                });
+                
+                const filteredTotals = Object.entries(categoryTotals).filter(([_, value]) => value > 0);
+                
+                const labels = filteredTotals.map(([key, _]) => key);
+                const data = filteredTotals.map(([_, value]) => value);
+                const backgroundColors = labels.map(label => colorMap[label]);
+
+                // Create container and canvas for the chart
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'flex flex-col items-center';
+                const title = document.createElement('h3');
+                title.className = 'text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200';
+                title.textContent = `${year} (${getTranslation(dataType)})`;
+                const canvasContainer = document.createElement('div');
+canvasContainer.className = 'w-full h-80';
+                const canvas = document.createElement('canvas');
+                canvasContainer.appendChild(canvas);
+                chartWrapper.append(title, canvasContainer);
+                comparisonPieChartsContainer.appendChild(chartWrapper);
+
+                // Create the chart
+                const pieChart = new Chart(canvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = context.chart.getDatasetMeta(0).total;
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                        return `${label}: ${currencyFormatter.format(value)} (${percentage})`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                comparisonPieCharts.push(pieChart);
+            });
+        }
+
+        function updateComparisonDeviationChart(transactions) {
+            const sortedYears = [...comparisonState.years].sort();
+            if (sortedYears.length < 2) {
+                // This case is handled in updateComparisonView, but as a safeguard:
+                comparisonDeviationChartContainer.classList.add('hidden');
+                noComparisonDeviationDataEl.classList.remove('hidden');
+                return;
+            }
+            
+            const displayCurrency = currencySelect.value.includes('JPY') ? 'JPY' : 'EUR';
+            const currencyFormatter = formatters[currentLang][displayCurrency];
+            const dataType = comparisonState.dataType;
+
+            // 1. Calculate totals for each category for each selected year
+            const totalsByCatYear = {};
+            transactions.forEach(t => {
+                const year = t.date.getFullYear();
+                const category = t.displayCategory;
+                
+                if (!totalsByCatYear[category]) {
+                    totalsByCatYear[category] = {};
+                }
+                if (!totalsByCatYear[category][year]) {
+                    totalsByCatYear[category][year] = 0;
+                }
+
+                let value = 0;
+                if (dataType === 'net') {
+                    value = t.displayAmount;
+                } else if (dataType === 'income' && t.displayAmount > 0) {
+                    value = t.displayAmount;
+                } else if (dataType === 'expenses' && t.displayAmount < 0) {
+                    value = Math.abs(t.displayAmount);
+                }
+                if (value !== 0) {
+                    totalsByCatYear[category][year] += value;
+                }
+            });
+
+            // 2. Calculate deviation between the first and last selected year to find the top categories
+            const firstYear = sortedYears[0];
+            const lastYear = sortedYears[sortedYears.length - 1];
+            
+            const deviations = Object.keys(totalsByCatYear).map(cat => {
+                const firstYearTotal = totalsByCatYear[cat][firstYear] || 0;
+                const lastYearTotal = totalsByCatYear[cat][lastYear] || 0;
+                return {
+                    category: cat,
+                    deviation: Math.abs(lastYearTotal - firstYearTotal)
+                };
+            }).filter(d => d.deviation > 0);
+
+            // 3. Sort by deviation and get top 10
+            deviations.sort((a, b) => b.deviation - a.deviation);
+            const top10Categories = deviations.slice(0, 10).map(d => d.category);
+
+            if (top10Categories.length === 0) {
+                comparisonDeviationChartContainer.classList.add('hidden');
+                noComparisonDeviationDataEl.classList.remove('hidden');
+                return;
+            }
+
+            comparisonDeviationChartContainer.classList.remove('hidden');
+            noComparisonDeviationDataEl.classList.add('hidden');
+            
+            // 4. Build datasets for the grouped bar chart
+            const datasets = sortedYears.map((year, index) => {
+                const color = categoryColors[index % categoryColors.length];
+                return {
+                    label: year.toString(),
+                    data: top10Categories.map(cat => totalsByCatYear[cat]?.[year] || 0),
+                    backgroundColor: color,
+                };
+            });
+
+            const chartData = {
+                labels: top10Categories,
+                datasets: datasets
+            };
+
+            const chartConfig = {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            ticks: { callback: value => currencyFormatter.format(value) }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'end',
+                            formatter: (value, context) => {
+                                if (value === 0) return null;
+                                const shortValue = new Intl.NumberFormat(currentLang, {
+                                    notation: "compact",
+                                    compactDisplay: "short"
+                                }).format(value);
+                                return shortValue;
+                            },
+                            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b',
+                            font: {
+                                weight: 'bold'
+                            },
+                            padding: 4
+                        }
+                    }
+                }
+            };
+
+            if (comparisonDeviationChart) {
+                comparisonDeviationChart.data = chartData;
+                comparisonDeviationChart.options = chartConfig.options;
+                comparisonDeviationChart.update();
+            } else {
+                comparisonDeviationChart = new Chart(comparisonDeviationChartCanvas, chartConfig);
+            }
+        }
+
+
+        // --- Alert and Toast Functions ---
+        function renderAlerts(alertsToRender) {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.innerHTML = '';
+            if (!alertsToRender || alertsToRender.length === 0) return;
+
+            const fragment = document.createDocumentFragment();
+
+            alertsToRender.forEach((alertData, index) => {
+                const alertEl = document.createElement('div');
+                alertEl.className = `alert alert-${alertData.type}`;
+                alertEl.dataset.alertId = index;
+
+                const iconMap = {
+                    info: '<svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>',
+                    warning: '<svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.026 2.287-1.026 2.923 0l5.482 8.877c.636 1.026-.166 2.37-1.462 2.37H4.237c-1.296 0-2.098-1.344-1.462-2.37l5.482-8.877zM9 8a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm.01 4a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>',
+                };
+                alertEl.innerHTML = iconMap[alertData.type] || '';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'alert-content';
+
+                const messageP = document.createElement('p');
+                messageP.textContent = alertData.message;
+                contentDiv.appendChild(messageP);
+
+                if (alertData.action && alertData.action.text && alertData.action.handler) {
+                    const actionP = document.createElement('p');
+                    actionP.className = 'mt-1';
+                    const actionLink = document.createElement('a');
+                    actionLink.textContent = alertData.action.text;
+                    actionLink.href = '#';
+                    actionLink.onclick = (e) => {
+                        e.preventDefault();
+                        alertData.action.handler();
+                    };
+                    actionP.appendChild(actionLink);
+                    contentDiv.appendChild(actionP);
+                }
+                
+                alertEl.appendChild(contentDiv);
+
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'alert-close-btn';
+                closeBtn.innerHTML = '<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>';
+                closeBtn.onclick = () => alertEl.remove();
+                alertEl.appendChild(closeBtn);
+
+                fragment.appendChild(alertEl);
+            });
+
+            alertContainer.appendChild(fragment);
+        }
+
+
+        // --- Utility Functions ---
+        function showLoading(message) {
+            loadingMessage.textContent = message || getTranslation('loadingMessage');
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+            loadingOverlay.classList.remove('flex');
+        }
+
+        function showError(message) {
+            uploadError.textContent = message;
+            uploadError.classList.remove('hidden');
+        }
+
+        function resetApp() {
+            // Clear state and URL
+            isInitialized = false;
+            history.replaceState({}, '', window.location.pathname);
+
+            // Reset variables
+            allTransactions = [];
+            exchangeRates = {};
+            newRatesFetched = false;
+            transactionViewFilter = null;
+            csvFileInput.value = '';
+            ratesJsonInput.value = '';
+            if (expenseChart) { expenseChart.destroy(); expenseChart = null; }
+            if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+            if (totalTimelineChart) { totalTimelineChart.destroy(); totalTimelineChart = null; }
+            if (comparisonChart) { comparisonChart.destroy(); comparisonChart = null; }
+            if (comparisonDeviationChart) { comparisonDeviationChart.destroy(); comparisonDeviationChart = null; }
+            comparisonPieCharts.forEach(c => c.destroy());
+            comparisonPieCharts = [];
+
+
+            // Reset UI
+            dashboardSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+            ratesUploadSuccess.classList.add('hidden');
+            downloadRatesBtn.disabled = true;
+            ratesInfoContainer.classList.add('hidden');
+            ratesLoadedInfo.textContent = '';
+            ratesAvailabilityGraph.innerHTML = '';
+            document.getElementById('alert-container').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
