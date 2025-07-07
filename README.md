@@ -35,7 +35,7 @@ Character encoding: UTF-8
 ### Usage
 
 ```
-html-minifier-terser input.html -o output.html \
+html-minifier-terser finance.html -o index.html \
   --collapse-whitespace \
   --remove-comments \
   --minify-css true \
