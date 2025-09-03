@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n-key="pageTitle">Dashboard - My Expenses - Extended Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tool-card {
+            transition: all 0.3s ease;
+            transform: perspective(1000px) rotateY(0deg);
+            height: 12rem; /* Feste Höhe für einheitliches Aussehen */
+        }
+        .tool-card:hover {
+            transform: translateY(-8px) perspective(1000px) rotateY(2deg);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-300">
+
+<div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+
+    <!-- Header -->
+    <header class="mb-12 flex justify-between items-start gap-4">
+        <div class="text-center flex-grow">
+            <h1 class="text-5xl font-bold text-slate-900 dark:text-white" data-i18n-key="headerTitle">Tool Dashboard</h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-2 text-lg" data-i18n-key="headerSubtitle">Wählen Sie ein Werkzeug aus, um zu starten.</p>
+        </div>
+        <div class="flex items-center gap-2 absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-8">
+            <!-- Language Switcher -->
+            <select id="lang-switcher" class="block pl-3 pr-8 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+            </select>
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-slate-900">
+                <svg id="theme-icon-light" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <svg id="theme-icon-dark" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+            </button>
+        </div>
+    </header>
+
+
+    <!-- Tool Grid -->
+    <main id="tool-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- Tools werden hier per JavaScript eingefügt -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center mt-16 text-slate-400 dark:text-slate-500 text-sm">
+        <p id="copyright"></p>
+    </footer>
+</div>
+
+<script>
+    // --- App State & Config ---
+    let currentLang = 'de';
+    const translations = {
+        de: {
+            pageTitle: "Dashboard - My Expenses - Extended Insights",
+            headerTitle: "Tool Dashboard",
+            headerSubtitle: "Wählen Sie ein Werkzeug aus, um zu starten.",
+            loadingError: "Fehler beim Laden der Tools. Bitte stellen Sie sicher, dass 'tools.json' existiert und korrekt formatiert ist.",
+            noTools: "Keine Tools in der Konfiguration gefunden.",
+            tool_Insights_name: "Insights"
+        },
+        en: {
+            pageTitle: "Dashboard - My Expenses - Extended Insights",
+            headerTitle: "Tool Dashboard",
+            headerSubtitle: "Select a tool to get started.",
+            loadingError: "Error loading tools. Please ensure 'tools.json' exists and is correctly formatted.",
+            noTools: "No tools found in the configuration.",
+            tool_Insights_name: "Insights"
+        },
+        ja: {
+            pageTitle: "ダッシュボード - My Expenses - 詳細な洞察",
+            headerTitle: "ツールダッシュボード",
+            headerSubtitle: "ツールを選択して開始します。",
+            loadingError: "ツールの読み込み中にエラーが発生しました。「tools.json」が存在し、正しくフォーマットされていることを確認してください。",
+            noTools: "設定にツールが見つかりませんでした。",
+            tool_Insights_name: "洞察"
+        }
+    };
+
+    // --- DOM Elements ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIconLight = document.getElementById('theme-icon-light');
+    const themeIconDark = document.getElementById('theme-icon-dark');
+    const langSwitcher = document.getElementById('lang-switcher');
+
+    // --- i18n Functions ---
+    const getTranslation = (key) => {
+        return translations[currentLang]?.[key] || translations.de[key] || key;
+    };
+
+    const updateText = () => {
+        document.querySelectorAll('[data-i18n-key]').forEach(el => {
+            el.textContent = getTranslation(el.dataset.i18nKey);
+        });
+        document.documentElement.lang = currentLang;
+        // Re-render tools to apply language changes to tool names/descriptions
+        if (document.getElementById('tool-grid').innerHTML !== '') {
+            fetchTools();
+        }
+    };
+
+    const setLanguage = (lang) => {
+        currentLang = lang;
+        langSwitcher.value = lang;
+        localStorage.setItem('language', lang);
+        updateText();
+    };
+
+    const initializeLanguage = () => {
+        const savedLang = localStorage.getItem('language');
+        const browserLang = navigator.language.split('-')[0];
+        const lang = savedLang || (['de', 'en', 'ja'].includes(browserLang) ? browserLang : 'de');
+        setLanguage(lang);
+    };
+
+    // --- Theme Management ---
+    const applyTheme = (theme) => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            themeIconLight.classList.remove('hidden');
+            themeIconDark.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            themeIconLight.classList.add('hidden');
+            themeIconDark.classList.remove('hidden');
+        }
+    };
+
+    const toggleTheme = () => {
+        const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+        localStorage.setItem('theme', newTheme);
+        applyTheme(newTheme);
+    };
+
+    const initializeTheme = () => {
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+        applyTheme(theme);
+    };
+
+    // --- Core Functions ---
+    async function fetchTools() {
+        try {
+            const response = await fetch('tools.json');
+            if (!response.ok) {
+                throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+            }
+            const tools = await response.json();
+            renderTools(tools);
+        } catch (error) {
+            console.error("tools.json konnte nicht geladen oder verarbeitet werden:", error);
+            const grid = document.getElementById('tool-grid');
+            grid.innerHTML = `<p class="text-red-500 col-span-full text-center">${getTranslation('loadingError')}</p>`;
+        }
+    }
+
+    function renderTools(tools) {
+        const grid = document.getElementById('tool-grid');
+        grid.innerHTML = ''; // Vorhandenen Inhalt leeren
+
+        if (!tools || tools.length === 0) {
+            grid.innerHTML = `<p class="text-slate-500 col-span-full text-center">${getTranslation('noTools')}</p>`;
+            return;
+        }
+
+        tools.forEach(tool => {
+            const card = document.createElement('a');
+            card.href = tool.path;
+            card.className = 'tool-card bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 flex flex-col items-center justify-center gap-4 no-underline text-center';
+
+            const toolName = getTranslation(`tool_${tool.name}_name`);
+
+            card.innerHTML = `
+                    <div class="text-6xl">${tool.emoji}</div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">${toolName}</h2>
+                `;
+            grid.appendChild(card);
+        });
+    }
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeTheme();
+        initializeLanguage();
+
+        // Copyright-Jahr dynamisch setzen
+        const currentYear = new Date().getFullYear();
+        const copyrightYear = Math.max(2025, currentYear);
+        document.getElementById('copyright').textContent = `© ${copyrightYear} My Expenses - Extended Insights`;
+
+        // Event Listeners
+        themeToggle.addEventListener('click', toggleTheme);
+        langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
+
+        // Initial fetch of tools
+        fetchTools();
+    });
+</script>
+</body>
+</html>
+
