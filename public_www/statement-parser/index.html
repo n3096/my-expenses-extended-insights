@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n-key="pageTitle">Statement Parser - My Expenses - Extended Insights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs" type="module"></script>
+
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .transaction-item {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .transaction-item.checked {
+            opacity: 0.5;
+        }
+        .transaction-item.checked .description,
+        .transaction-item.checked .main-amount {
+            text-decoration: line-through;
+        }
+        .transaction-item:hover {
+            transform: translateX(4px);
+            background-color: #f7fafc;
+        }
+        .dark .transaction-item:hover {
+            background-color: #2d3748;
+        }
+        .balance-item {
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .dark .balance-item {
+            background-color: #1e293b; /* slate-800 */
+        }
+        #loading-overlay { z-index: 50; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-300">
+
+<div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/75 dark:bg-slate-900/75 backdrop-blur-sm flex-col items-center justify-center hidden">
+        <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p id="loading-message" data-i18n-key="loadingMessage" class="mt-4 text-slate-600 dark:text-slate-400">PDF wird verarbeitet...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="mb-8 flex justify-between items-start gap-4">
+        <div>
+            <h1 class="text-4xl font-bold text-slate-900 dark:text-white" data-i18n-key="mainTitle">Statement Parser</h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1" data-i18n-key="mainSubtitle">Lade einen Kontoauszug (PDF) hoch, um die Transaktionen zu extrahieren.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Language Switcher -->
+            <select id="lang-switcher" class="block pl-3 pr-8 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+            </select>
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <svg id="theme-icon-light" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <svg id="theme-icon-dark" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Upload Section -->
+    <div id="upload-section" class="text-center py-10 px-6 bg-white dark:bg-slate-800 rounded-2xl shadow-md border-2 border-dashed border-slate-200 dark:border-slate-700">
+        <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
+        <h3 class="mt-2 text-lg font-semibold text-slate-900 dark:text-white" data-i18n-key="uploadTitle">Kontoauszug hochladen</h3>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" data-i18n-key="uploadSubtitle">Ziehe eine PDF- oder CSV-Datei hierher oder klicke zum Auswählen.</p>
+        <div class="mt-6">
+            <input type="file" id="file-input" class="sr-only" accept=".pdf,.csv">
+            <label for="file-input" class="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" data-i18n-key="uploadButton">
+                Datei auswählen
+            </label>
+        </div>
+    </div>
+    <p id="upload-error" class="text-red-500 dark:text-red-400 text-sm mt-4 hidden text-center"></p>
+
+    <!-- Result Section -->
+    <main id="result-section" class="hidden mt-8">
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md mb-6">
+            <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                <div>
+                    <h2 id="bank-name" class="text-2xl font-bold text-slate-900 dark:text-white"></h2>
+                    <p id="bank-iban" class="text-slate-500 dark:text-slate-400 font-mono"></p>
+                </div>
+                <button id="reset-button" class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 dark:text-indigo-200 bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900" data-i18n-key="resetButton">
+                    Neue Datei
+                </button>
+            </div>
+            <div class="border-t border-slate-200 dark:border-slate-700 pt-4">
+                <p id="statement-period" class="text-sm text-slate-600 dark:text-slate-400 mb-3 font-medium"></p>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <label for="filter-date-from" class="text-sm font-medium" data-i18n-key="filterFrom">Von:</label>
+                    <input type="date" id="filter-date-from" class="block w-full sm:w-auto pl-3 pr-2 py-1 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                    <label for="filter-date-to" class="text-sm font-medium" data-i18n-key="filterTo">Bis:</label>
+                    <input type="date" id="filter-date-to" class="block w-full sm:w-auto pl-3 pr-2 py-1 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
+                </div>
+            </div>
+        </div>
+
+
+        <div id="transaction-list" class="space-y-2">
+            <!-- Transactions will be injected here -->
+        </div>
+    </main>
+
+</div>
+
+<script type="module">
+    // --- PDF.js Setup ---
+    const { pdfjsLib } = globalThis;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs`;
+
+    // --- DOM Elements ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIconLight = document.getElementById('theme-icon-light');
+    const themeIconDark = document.getElementById('theme-icon-dark');
+    const langSwitcher = document.getElementById('lang-switcher');
+    const uploadSection = document.getElementById('upload-section');
+    const resultSection = document.getElementById('result-section');
+    const fileInput = document.getElementById('file-input');
+    const resetButton = document.getElementById('reset-button');
+    const uploadError = document.getElementById('upload-error');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const filterDateFrom = document.getElementById('filter-date-from');
+    const filterDateTo = document.getElementById('filter-date-to');
+
+    // --- App State ---
+    let allParsedItems = [];
+
+    // --- i18n ---
+    let currentLang = 'de';
+    const translations = {
+        de: {
+            pageTitle: "Statement Parser - My Expenses - Erweiterte Einblicke",
+            loadingMessage: "PDF wird verarbeitet...",
+            mainTitle: "Statement Parser",
+            mainSubtitle: "Lade einen Kontoauszug (PDF) hoch, um die Transaktionen zu extrahieren.",
+            uploadTitle: "Kontoauszug hochladen",
+            uploadSubtitle: "Ziehe eine PDF- oder CSV-Datei hierher oder klicke zum Auswählen.",
+            uploadButton: "Datei auswählen",
+            resetButton: "Neue Datei",
+            errorPDF: "Bitte wählen Sie eine gültige PDF-Datei aus.",
+            errorNoTransactions: "Keine Transaktionen in der Datei gefunden. Das Format wird möglicherweise nicht unterstützt.",
+            errorReadFile: "Fehler beim Lesen der Datei.",
+            errorProcessPDF: "Ein Fehler ist beim Verarbeiten der Datei aufgetreten.",
+            bookedOn: "Gebucht:",
+            interimBalance: "Zwischensaldo",
+            statementPeriod: "Abrechnungszeitraum:",
+            filterFrom: "Von:",
+            filterTo: "Bis:",
+            errorFileType: "Bitte eine PDF- oder CSV-Datei hochladen.",
+            errorUnsupportedCSV: "Dieses CSV-Format wird nicht unterstützt."
+        },
+        en: {
+            pageTitle: "Statement Parser - My Expenses - Extended Insights",
+            loadingMessage: "Processing PDF...",
+            mainTitle: "Statement Parser",
+            mainSubtitle: "Upload a bank statement (PDF) to extract transactions.",
+            uploadTitle: "Upload Statement",
+            uploadSubtitle: "Drag and drop a PDF or CSV file here or click to select.",
+            uploadButton: "Select File",
+            resetButton: "New File",
+            errorPDF: "Please select a valid PDF file.",
+            errorNoTransactions: "No transactions found in the file. The format might not be supported.",
+            errorReadFile: "Error reading the file.",
+            errorProcessPDF: "An error occurred while processing the file.",
+            bookedOn: "Booked:",
+            interimBalance: "Interim Balance",
+            statementPeriod: "Statement Period:",
+            filterFrom: "From:",
+            filterTo: "To:",
+            errorFileType: "Please upload a PDF or CSV file.",
+            errorUnsupportedCSV: "This CSV format is not supported."
+        },
+        ja: {
+            pageTitle: "明細パーサー - My Expenses - 詳細な洞察",
+            loadingMessage: "PDFを処理中...",
+            mainTitle: "明細パーサー",
+            mainSubtitle: "取引明細書（PDF）をアップロードして取引を抽出します。",
+            uploadTitle: "明細書をアップロード",
+            uploadSubtitle: "PDFまたはCSVファイルをここにドラッグ＆ドロップするか、クリックして選択します。",
+            uploadButton: "ファイルを選択",
+            resetButton: "新しいファイル",
+            errorPDF: "有効なPDFファイルを選択してください。",
+            errorNoTransactions: "ファイルに取引が見つかりませんでした。この形式はサポートされていない可能性があります。",
+            errorReadFile: "ファイルの読み取り中にエラーが発生しました。",
+            errorProcessPDF: "ファイルの処理中にエラーが発生しました。",
+            bookedOn: "記帳日:",
+            interimBalance: "中間残高",
+            statementPeriod: "計算期間:",
+            filterFrom: "から:",
+            filterTo: "まで:",
+            errorFileType: "PDFまたはCSVファイルをアップロードしてください。",
+            errorUnsupportedCSV: "このCSV形式はサポートされていません。"
+        }
+    };
+    const getTranslation = (key) => translations[currentLang]?.[key] || translations.de[key];
+    const updateText = () => {
+        document.querySelectorAll('[data-i18n-key]').forEach(el => {
+            el.textContent = getTranslation(el.dataset.i18nKey);
+        });
+        document.documentElement.lang = currentLang;
+    };
+    const setLanguage = (lang) => {
+        currentLang = lang;
+        langSwitcher.value = lang;
+        localStorage.setItem('language', lang);
+        updateText();
+    };
+    const initializeLanguage = () => {
+        const savedLang = localStorage.getItem('language') || navigator.language.split('-')[0];
+        setLanguage(['de', 'en', 'ja'].includes(savedLang) ? savedLang : 'de');
+    };
+
+    // --- Theme Management ---
+    const applyTheme = (theme) => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            themeIconLight.classList.remove('hidden');
+            themeIconDark.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            themeIconLight.classList.add('hidden');
+            themeIconDark.classList.remove('hidden');
+        }
+    };
+    const toggleTheme = () => {
+        const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+        localStorage.setItem('theme', newTheme);
+        applyTheme(newTheme);
+    };
+    const initializeTheme = () => {
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme || (systemPrefersDark ? 'dark' : 'light'));
+    };
+
+    // --- Utility Functions ---
+    function parseGermanDate(str) {
+        if (!str) return null;
+        const [day, month, year] = str.split('.');
+        return new Date(year, month - 1, day);
+    }
+
+    function parsePayPayDate(str) {
+        if (!str) return null;
+        const parts = str.split(' ')[0].split('/');
+        if (parts.length !== 3) return null;
+        const [year, month, day] = parts;
+        return new Date(year, month - 1, day);
+    }
+
+    function formatToGermanDate(date) {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${day}.${month}.${year}`;
+    }
+
+    function formatToInputDate(date) {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // --- App Logic ---
+    function showError(messageKey) {
+        uploadError.textContent = getTranslation(messageKey);
+        uploadError.classList.remove('hidden');
+    }
+
+    function showLoading() {
+        loadingOverlay.classList.remove('hidden');
+        loadingOverlay.classList.add('flex');
+    }
+
+    function hideLoading() {
+        loadingOverlay.classList.add('hidden');
+        loadingOverlay.classList.remove('flex');
+    }
+
+    function parseTriodosStatement(text, accountType) {
+        const bankName = `Triodos Bank (${accountType})`;
+        const ibanMatch = text.match(/IBAN:\s*(DE\d{2}\s\d{4}\s\d{4}\s\d{4}\s\d{4}\s\d{2})/);
+        const iban = ibanMatch ? ibanMatch[1].replace(/\s/g, '') : 'N/A';
+
+        const yearMatch = text.match(/alter Kontostand vom \d{2}\.\d{2}\.(\d{4})/);
+        const year = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
+
+        let allItems = [];
+        let transactionDates = [];
+
+        const balanceRegex = /(alter Kontostand vom .*?|neuer Kontostand vom .*?)\s+([\d\.]*,\d{2})\s*([SHΗ])/g;
+        let balanceMatch;
+        while ((balanceMatch = balanceRegex.exec(text))) {
+            allItems.push({
+                type: 'balance',
+                description: balanceMatch[1].trim().replace(" Η", " H"),
+                amount: parseFloat(balanceMatch[2].trim().replace(/\./g, '').replace(',', '.')),
+                currency: 'EUR',
+                originalIndex: balanceMatch.index
+            });
+        }
+
+        const transactionSectionMatch = text.match(/alter Kontostand vom[\s\S]*neuer Kontostand vom/);
+        if (transactionSectionMatch) {
+            const transactionText = transactionSectionMatch[0];
+            const transactionRegex = /(\d{2}\.\d{2}\.)\s+(\d{2}\.\d{2}\.)\s+([\s\S]*?)\s+([\d\.]*,\d{2})\s+([SHΗ])/g;
+            let txMatch;
+            while ((txMatch = transactionRegex.exec(transactionText))) {
+                const valueDate = `${txMatch[1]}${year}`;
+                const bookingDate = `${txMatch[2]}${year}`;
+                const description = txMatch[3].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                const amountRaw = parseFloat(txMatch[4].replace(/\./g, '').replace(',', '.'));
+                const type = txMatch[5];
+                const amount = (type === 'S') ? -amountRaw : amountRaw;
+
+                transactionDates.push(parseGermanDate(bookingDate));
+
+                allItems.push({
+                    type: 'transaction',
+                    bookingDate: bookingDate,
+                    transactionDate: valueDate,
+                    description: description,
+                    amount: amount,
+                    currency: 'EUR',
+                    extraInfo: '',
+                    originalIndex: txMatch.index
+                });
+            }
+        }
+
+        allItems.sort((a, b) => a.originalIndex - b.originalIndex);
+
+        let dateRange = null;
+        if(transactionDates.length > 0){
+            const minDate = new Date(Math.min(...transactionDates));
+            const maxDate = new Date(Math.max(...transactionDates));
+            dateRange = {
+                from: formatToGermanDate(minDate),
+                to: formatToGermanDate(maxDate)
+            }
+        }
+
+        return { bankName, iban, items: allItems, dateRange };
+    }
+
+    function parsePayPayStatement(csvText) {
+        const bankName = "PayPay";
+        const lines = csvText.trim().split('\n');
+        lines.shift(); // Remove header
+
+        let minDate = null;
+        let maxDate = null;
+
+        // Simple CSV parser that handles quoted commas
+        const parseCsvLine = (line) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result.map(val => val.replace(/^"|"$/g, '').trim());
+        };
+
+        const items = lines.map((line, index) => {
+            const columns = parseCsvLine(line);
+            if (columns.length < 10) return null;
+
+            const transactionType = columns[7];
+            // Exclude all transactions related to points
+            if (transactionType.includes('Points')) {
+                return null;
+            }
+
+            const dateTimeStr = columns[0];
+            const amountOutStr = columns[1];
+            const amountInStr = columns[2];
+            const businessName = columns[8];
+            const method = columns[9];
+
+            let amount = 0;
+            if (amountOutStr && amountOutStr !== '-') {
+                // Remove thousands separator before parsing
+                amount = -parseFloat(amountOutStr.replace(/,/g, ''));
+            } else if (amountInStr && amountInStr !== '-') {
+                // Remove thousands separator before parsing
+                amount = parseFloat(amountInStr.replace(/,/g, ''));
+            }
+
+            if (isNaN(amount) || amount === 0) {
+                return null;
+            }
+
+            let description = transactionType === businessName ? transactionType : `${transactionType}: ${businessName}`;
+            if (transactionType === 'Top-Up' && method && method !== '-') {
+                description += ` (${method})`;
+            }
+
+            const transactionDateObj = parsePayPayDate(dateTimeStr);
+            if (!transactionDateObj) return null;
+
+            if (!minDate || transactionDateObj < minDate) minDate = transactionDateObj;
+            if (!maxDate || transactionDateObj > maxDate) maxDate = transactionDateObj;
+
+            const germanDate = formatToGermanDate(transactionDateObj);
+
+            return {
+                type: 'transaction',
+                bookingDate: germanDate,
+                transactionDate: germanDate,
+                description: description.trim(),
+                amount,
+                currency: 'JPY',
+                extraInfo: '',
+                originalIndex: index
+            };
+        }).filter(Boolean);
+
+        const dateRange = minDate && maxDate ? {
+            from: formatToGermanDate(minDate),
+            to: formatToGermanDate(maxDate)
+        } : null;
+
+        items.sort((a, b) => {
+            const dateA = parseGermanDate(a.bookingDate);
+            const dateB = parseGermanDate(b.bookingDate);
+            if (dateA.getTime() !== dateB.getTime()) {
+                return dateB.getTime() - dateA.getTime();
+            }
+            return a.originalIndex - b.originalIndex;
+        });
+
+        return { bankName, iban: 'PayPay Balance', items, dateRange };
+    }
+
+
+    function parseHanseaticBankStatement(text) {
+        const bankName = "Hanseatic Bank";
+        const ibanMatch = text.match(/IBAN:\s*(DE\d{20})/);
+        const iban = ibanMatch ? ibanMatch[1] : 'N/A';
+        const dateRangeMatch = text.match(/Abrechnungszeitraum:\s*(\d{2}\.\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{2}\.\d{4})/);
+        const dateRange = dateRangeMatch ? { from: dateRangeMatch[1], to: dateRangeMatch[2] } : null;
+
+        let allItems = [];
+
+        let content = text.substring(text.indexOf('Umsätze'));
+        content = content.replace(/\s+/g, ' ');
+
+        const balanceRegex = /(Alter Saldo|Neuer Saldo|Übertrag Saldo(?: auf Seite \d+| von Seite \d+)?)\s*(-?[\d\.]*,\d{2})/g;
+        let balanceMatch;
+        while ((balanceMatch = balanceRegex.exec(content))) {
+            allItems.push({
+                type: 'balance',
+                description: balanceMatch[1].trim(),
+                amount: parseFloat(balanceMatch[2].trim().replace(/\./g, '').replace(',', '.')),
+                currency: 'EUR',
+                originalIndex: balanceMatch.index
+            });
+        }
+
+        const blocks = content.matchAll(/(\d{2}\.\d{2}\.\d{4}.*?)(?=\s\d{2}\.\d{2}\.\d{4}|\s*(?:Alter|Neuer|Übertrag)\s*Saldo|$)/g);
+
+        for (const blockMatch of blocks) {
+            const fullBlock = blockMatch[0].trim();
+            const originalIndex = blockMatch.index;
+            if (!fullBlock) continue;
+
+            const amountMatches = [...fullBlock.matchAll(/-?[\d\.]*,\d{2}/g)];
+            if (amountMatches.length === 0) continue;
+
+            const euroAmountMatch = amountMatches[amountMatches.length - 1];
+            const amount = parseFloat(euroAmountMatch[0].replace(/\./g, '').replace(',', '.'));
+
+            if (allItems.some(item => Math.abs(item.originalIndex - originalIndex) < 20 && item.amount === amount)) {
+                continue;
+            }
+
+            const dateMatches = [...fullBlock.matchAll(/\d{2}\.\d{2}\.\d{4}/g)];
+            if (!dateMatches.length) continue;
+
+            const bookingDate = dateMatches[0][0];
+            let transactionDate = bookingDate;
+            if (dateMatches.length > 1 && (dateMatches[1].index - dateMatches[0].index) < 20) {
+                transactionDate = dateMatches[1][0];
+            }
+
+            const descriptionStart = fullBlock.indexOf(transactionDate) + 10;
+            const descriptionEnd = euroAmountMatch.index;
+            if (descriptionStart >= descriptionEnd) continue;
+
+            const descriptionPart = fullBlock.substring(descriptionStart, descriptionEnd).trim();
+
+            let extraInfo = '';
+            const currencyMatch = descriptionPart.match(/(\d{1,3}(?:.\d{3})*,\d{2})\s+([A-Z]{3})/);
+            if (currencyMatch) {
+                const originalAmount = currencyMatch[1];
+                const originalCurrency = currencyMatch[2];
+                const rateMatch = descriptionPart.match(/Umrechnungskurs:?\s*([\d\.,]+)/);
+                extraInfo = `Original: ${originalAmount} ${originalCurrency}`;
+                if (rateMatch) {
+                    extraInfo += ` (Kurs: ${rateMatch[1]})`;
+                }
+            }
+
+            let cleanDescription = descriptionPart
+                .replace(/Kartenumsatz|Gutschrift/, '')
+                .replace(/Kartenabrechnung\s*[\d\/]+/, 'Kartenabrechnung')
+                .replace(/\s+\d{1,3}(?:.\d{3})*,\d{2}\s+[A-Z]{3}.*/, '')
+                .replace(/\s+\d{4}$/, '')
+                .trim();
+
+            if (!cleanDescription) continue;
+
+            allItems.push({
+                type: 'transaction',
+                bookingDate,
+                transactionDate,
+                description: cleanDescription,
+                amount,
+                currency: 'EUR',
+                extraInfo,
+                originalIndex
+            });
+        }
+
+        const uniqueItems = [];
+        const seen = new Set();
+        allItems.forEach(item => {
+            const key = item.type === 'transaction'
+                ? `${item.bookingDate}-${item.transactionDate}-${item.amount}-${item.description.substring(0, 20)}`
+                : `${item.description}-${item.amount}`;
+            if (!seen.has(key)) {
+                uniqueItems.push(item);
+                seen.add(key);
+            }
+        });
+
+        let consolidatedItems = [];
+        let transferSaldoFound = false;
+        uniqueItems.forEach(item => {
+            if (item.description && item.description.startsWith('Übertrag Saldo')) {
+                if (!transferSaldoFound) {
+                    consolidatedItems.push({ ...item, description: getTranslation('interimBalance') });
+                    transferSaldoFound = true;
+                }
+            } else {
+                consolidatedItems.push(item);
+            }
+        });
+
+        consolidatedItems.sort((a, b) => {
+            const bookingDateA = a.type === 'transaction' ? parseGermanDate(a.bookingDate) : null;
+            const bookingDateB = b.type === 'transaction' ? parseGermanDate(b.bookingDate) : null;
+
+            if (bookingDateA && bookingDateB) {
+                if (bookingDateA.getTime() !== bookingDateB.getTime()) {
+                    return bookingDateB.getTime() - bookingDateA.getTime();
+                }
+                return a.originalIndex - b.originalIndex;
+            }
+
+            return b.originalIndex - a.originalIndex;
+        });
+
+        return { bankName, iban, items: consolidatedItems, dateRange };
+    }
+
+    function displayTransactions(items) {
+        const list = document.getElementById('transaction-list');
+        list.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        let lastDate = null;
+
+        // sort items by date descending for display
+        const sortedItems = [...items].sort((a,b) => {
+            if (a.type === 'balance' || b.type === 'balance') return 0;
+            const dateA = parseGermanDate(a.bookingDate);
+            const dateB = parseGermanDate(b.bookingDate);
+            if (dateA < dateB) return 1;
+            if (dateA > dateB) return -1;
+            return a.originalIndex - b.originalIndex;
+        });
+
+
+        sortedItems.forEach(item => {
+            if (item.type === 'transaction') {
+                const displayDate = item.transactionDate || item.bookingDate;
+                if (displayDate !== lastDate) {
+                    const dateSeparator = document.createElement('div');
+                    dateSeparator.className = "text-sm font-semibold text-slate-500 dark:text-slate-400 pt-4 pb-1";
+                    dateSeparator.textContent = displayDate;
+                    fragment.appendChild(dateSeparator);
+                    lastDate = displayDate;
+                }
+
+                const txItem = document.createElement('div');
+                txItem.className = 'transaction-item bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm flex justify-between items-center';
+                txItem.onclick = () => txItem.classList.toggle('checked');
+
+                const isExpense = item.amount < 0;
+                const numberFormatter = new Intl.NumberFormat(currentLang.startsWith('de') ? 'de-DE' : 'en-US', { style: 'currency', currency: item.currency });
+                let formattedAmount = numberFormatter.format(item.amount);
+                if (item.amount > 0) {
+                    formattedAmount = `+${formattedAmount}`;
+                }
+
+                const bookingInfo = item.bookingDate !== item.transactionDate ? `<p class="text-xs text-slate-400 dark:text-slate-500">${getTranslation('bookedOn')} ${item.bookingDate}</p>` : '';
+                const extraInfoHTML = item.extraInfo ? `<p class="text-xs text-slate-400 dark:text-slate-500">${item.extraInfo}</p>` : '';
+
+                txItem.innerHTML = `
+                    <div class="flex-grow overflow-hidden pr-4">
+                        <p class="description font-medium text-slate-800 dark:text-slate-200 truncate" title="${item.description}">${item.description}</p>
+                        ${bookingInfo}
+                        ${extraInfoHTML}
+                    </div>
+                    <div class="main-amount font-bold text-lg whitespace-nowrap ${isExpense ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}">
+                        ${formattedAmount}
+                    </div>
+                `;
+                fragment.appendChild(txItem);
+            } else if (item.type === 'balance') {
+                const balanceItem = document.createElement('div');
+                balanceItem.className = 'balance-item p-3 rounded-lg flex justify-between items-center border-t border-b border-slate-200 dark:border-slate-700 my-2';
+                const formattedAmount = new Intl.NumberFormat(currentLang.startsWith('de') ? 'de-DE' : 'en-US', { style: 'currency', currency: item.currency }).format(item.amount);
+                balanceItem.innerHTML = `
+                    <p class="font-semibold text-sm italic text-slate-600 dark:text-slate-400">${item.description}</p>
+                    <p class="font-bold text-sm italic text-slate-700 dark:text-slate-300">${formattedAmount}</p>
+                `;
+                fragment.appendChild(balanceItem);
+            }
+        });
+
+        list.appendChild(fragment);
+    }
+
+    function filterAndDisplay() {
+        const fromDateStr = filterDateFrom.value;
+        const toDateStr = filterDateTo.value;
+
+        const fromDate = fromDateStr ? new Date(fromDateStr) : null;
+        if(fromDate) fromDate.setHours(0, 0, 0, 0);
+
+        const toDate = toDateStr ? new Date(toDateStr) : null;
+        if(toDate) toDate.setHours(23, 59, 59, 999);
+
+        const filteredItems = allParsedItems.filter(item => {
+            if (item.type === 'balance') return true;
+
+            const itemDate = parseGermanDate(item.transactionDate || item.bookingDate);
+            if (!itemDate) return true;
+
+            const afterFrom = fromDate ? itemDate >= fromDate : true;
+            const beforeTo = toDate ? itemDate <= toDate : true;
+
+            return afterFrom && beforeTo;
+        });
+
+        displayTransactions(filteredItems);
+    }
+
+    function setupResults(data) {
+        allParsedItems = data.items;
+        document.getElementById('bank-name').textContent = data.bankName;
+        document.getElementById('bank-iban').textContent = data.iban;
+        const periodEl = document.getElementById('statement-period');
+
+        if(data.dateRange) {
+            periodEl.textContent = `${getTranslation('statementPeriod')} ${data.dateRange.from} - ${data.dateRange.to}`;
+            filterDateFrom.value = formatToInputDate(parseGermanDate(data.dateRange.from));
+            filterDateTo.value = formatToInputDate(parseGermanDate(data.dateRange.to));
+        } else {
+            periodEl.textContent = '';
+            filterDateFrom.value = '';
+            filterDateTo.value = '';
+        }
+
+        displayTransactions(allParsedItems);
+        uploadSection.classList.add('hidden');
+        resultSection.classList.remove('hidden');
+    }
+
+    async function handleFile(file) {
+        if (!file) { return; }
+
+        const lowerCaseName = file.name.toLowerCase();
+        const isPdf = lowerCaseName.endsWith('.pdf');
+        const isCsv = lowerCaseName.endsWith('.csv');
+
+        if (!isPdf && !isCsv) {
+            showError('errorFileType');
+            return;
+        }
+
+        uploadError.classList.add('hidden');
+        showLoading();
+
+        try {
+            let parsedData;
+            if (isPdf) {
+                const typedarray = new Uint8Array(await file.arrayBuffer());
+                const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                let fullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    fullText += textContent.items.map(item => item.str).join('\n');
+                }
+
+                if (fullText.includes("Triodos Bank")) {
+                    if (fullText.includes("Tagesgeld")) {
+                        parsedData = parseTriodosStatement(fullText, "Tagesgeld");
+                    } else {
+                        parsedData = parseTriodosStatement(fullText, "Girokonto");
+                    }
+                } else if (fullText.includes("Hanseatic Bank")) {
+                    parsedData = parseHanseaticBankStatement(fullText);
+                } else {
+                    throw new Error('Unsupported PDF format');
+                }
+            } else if (isCsv) {
+                const text = await file.text();
+                if (text.includes('Date & Time,Amount Outgoing (Yen)')) {
+                    parsedData = parsePayPayStatement(text);
+                } else {
+                    throw new Error('Unsupported CSV format');
+                }
+            }
+
+            if (!parsedData || parsedData.items.filter(i => i.type === 'transaction').length === 0) {
+                showError('errorNoTransactions');
+            } else {
+                setupResults(parsedData);
+            }
+        } catch (error) {
+            console.error('Error processing file:', error);
+            showError(error.message.includes('Unsupported') ? 'errorUnsupportedCSV' : 'errorProcessPDF');
+        } finally {
+            hideLoading();
+        }
+    }
+
+
+    function resetApp() {
+        fileInput.value = '';
+        allParsedItems = [];
+        resultSection.classList.add('hidden');
+        uploadSection.classList.remove('hidden');
+        document.getElementById('transaction-list').innerHTML = '';
+        uploadError.classList.add('hidden');
+    }
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeTheme();
+        initializeLanguage();
+        themeToggle.addEventListener('click', toggleTheme);
+        langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        resetButton.addEventListener('click', resetApp);
+        filterDateFrom.addEventListener('change', filterAndDisplay);
+        filterDateTo.addEventListener('change', filterAndDisplay);
+
+
+        // Drag & Drop Listeners
+        const dropZone = document.getElementById('upload-section');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/20', 'border-indigo-400');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+    });
+</script>
+</body>
+</html>

@@ -3,5 +3,10 @@
     "name": "Insights",
     "emoji": "📊",
     "path": "insights"
+  },
+  {
+    "name": "Statement Parser",
+    "emoji": "🧾",
+    "path": "statement-parser"
   }
 ]

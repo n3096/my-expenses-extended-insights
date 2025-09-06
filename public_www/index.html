@@ -53,10 +53,9 @@
         </div>
     </header>
 
-
     <!-- Tool Grid -->
     <main id="tool-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <!-- Tools werden hier per JavaScript eingefügt -->
+        <!-- Tools will be inserted here by JavaScript -->
     </main>
 
     <!-- Footer -->
@@ -66,6 +65,12 @@
 </div>
 
 <script>
+    // --- DOM Elements ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIconLight = document.getElementById('theme-icon-light');
+    const themeIconDark = document.getElementById('theme-icon-dark');
+    const langSwitcher = document.getElementById('lang-switcher');
+
     // --- App State & Config ---
     let currentLang = 'de';
     const translations = {
@@ -74,32 +79,23 @@
             headerTitle: "Tool Dashboard",
             headerSubtitle: "Wählen Sie ein Werkzeug aus, um zu starten.",
             loadingError: "Fehler beim Laden der Tools. Bitte stellen Sie sicher, dass 'tools.json' existiert und korrekt formatiert ist.",
-            noTools: "Keine Tools in der Konfiguration gefunden.",
-            tool_Insights_name: "Insights"
+            noTools: "Keine Tools in der Konfiguration gefunden."
         },
         en: {
             pageTitle: "Dashboard - My Expenses - Extended Insights",
             headerTitle: "Tool Dashboard",
             headerSubtitle: "Select a tool to get started.",
             loadingError: "Error loading tools. Please ensure 'tools.json' exists and is correctly formatted.",
-            noTools: "No tools found in the configuration.",
-            tool_Insights_name: "Insights"
+            noTools: "No tools found in the configuration."
         },
         ja: {
             pageTitle: "ダッシュボード - My Expenses - 詳細な洞察",
             headerTitle: "ツールダッシュボード",
             headerSubtitle: "ツールを選択して開始します。",
             loadingError: "ツールの読み込み中にエラーが発生しました。「tools.json」が存在し、正しくフォーマットされていることを確認してください。",
-            noTools: "設定にツールが見つかりませんでした。",
-            tool_Insights_name: "洞察"
+            noTools: "設定にツールが見つかりませんでした。"
         }
     };
-
-    // --- DOM Elements ---
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeIconLight = document.getElementById('theme-icon-light');
-    const themeIconDark = document.getElementById('theme-icon-dark');
-    const langSwitcher = document.getElementById('lang-switcher');
 
     // --- i18n Functions ---
     const getTranslation = (key) => {
@@ -111,10 +107,6 @@
             el.textContent = getTranslation(el.dataset.i18nKey);
         });
         document.documentElement.lang = currentLang;
-        // Re-render tools to apply language changes to tool names/descriptions
-        if (document.getElementById('tool-grid').innerHTML !== '') {
-            fetchTools();
-        }
     };
 
     const setLanguage = (lang) => {
@@ -162,12 +154,12 @@
         try {
             const response = await fetch('tools.json');
             if (!response.ok) {
-                throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+                throw new Error(`HTTP Error! Status: ${response.status}`);
             }
             const tools = await response.json();
             renderTools(tools);
         } catch (error) {
-            console.error("tools.json konnte nicht geladen oder verarbeitet werden:", error);
+            console.error("Could not load or parse tools.json:", error);
             const grid = document.getElementById('tool-grid');
             grid.innerHTML = `<p class="text-red-500 col-span-full text-center">${getTranslation('loadingError')}</p>`;
         }
@@ -175,7 +167,7 @@
 
     function renderTools(tools) {
         const grid = document.getElementById('tool-grid');
-        grid.innerHTML = ''; // Vorhandenen Inhalt leeren
+        grid.innerHTML = ''; // Clear existing content
 
         if (!tools || tools.length === 0) {
             grid.innerHTML = `<p class="text-slate-500 col-span-full text-center">${getTranslation('noTools')}</p>`;
@@ -187,12 +179,10 @@
             card.href = tool.path;
             card.className = 'tool-card bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 flex flex-col items-center justify-center gap-4 no-underline text-center';
 
-            const toolName = getTranslation(`tool_${tool.name}_name`);
-
             card.innerHTML = `
-                    <div class="text-6xl">${tool.emoji}</div>
-                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">${toolName}</h2>
-                `;
+                <div class="text-6xl">${tool.emoji}</div>
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white">${tool.name}</h2>
+            `;
             grid.appendChild(card);
         });
     }
@@ -202,16 +192,13 @@
         initializeTheme();
         initializeLanguage();
 
-        // Copyright-Jahr dynamisch setzen
         const currentYear = new Date().getFullYear();
         const copyrightYear = Math.max(2025, currentYear);
         document.getElementById('copyright').textContent = `© ${copyrightYear} My Expenses - Extended Insights`;
 
-        // Event Listeners
         themeToggle.addEventListener('click', toggleTheme);
         langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
 
-        // Initial fetch of tools
         fetchTools();
     });
 </script>
