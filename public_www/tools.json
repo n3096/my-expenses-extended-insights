@@ -8,5 +8,10 @@
     "name": "Statement Parser",
     "emoji": "🧾",
     "path": "statement-parser"
+  },
+  {
+    "name": "Differ",
+    "emoji": "⚖️",
+    "path": "differ"
   }
 ]
