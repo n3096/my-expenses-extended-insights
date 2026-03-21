@@ -554,6 +554,15 @@
         </div>
     </div>
 
+    <script type="module">
+        import { ExchangeRateService } from './js/services/ExchangeRateService.js';
+
+        window.ExchangeRateService = ExchangeRateService;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.ExchangeRateService.checkAvailability();
+        });
+    </script>
 
     <script>
         // --- DOM Elements ---
@@ -1633,77 +1642,18 @@
          * @param {Array<Object>} transactions The list of all transactions.
          * @returns {{alerts: Array<Object>}} An object containing any alerts generated during the fetch process.
          */
-        async function fetchAllExchangeRates(transactions) {
-            const localAlerts = [];
-            const uniqueDates = [...new Set(transactions.map(t => dateToISO(t.date)))];
-            const foreignCurrencyDates = new Set(transactions.filter(t => t.currency !== 'EUR').map(t => dateToISO(t.date)));
-            
-            const datesToFetch = uniqueDates.filter(date => !exchangeRates[date] || exchangeRates[date] === null);
-
-            if (datesToFetch.length > 0) {
-                showLoading(getTranslation('loadingRates'));
-                
-                const chunkSize = 100;
-                let successfulFetches = 0;
-                const totalToFetch = datesToFetch.length;
-
-                for (let i = 0; i < totalToFetch; i += chunkSize) {
-                    const chunk = datesToFetch.slice(i, i + chunkSize);
-                    loadingMessage.textContent = getTranslation('loadingRatesProgress', {
-                        start: i + 1,
-                        end: Math.min(i + chunkSize, totalToFetch),
-                        total: totalToFetch
-                    });
-                    
-                    const promises = chunk.map(async (dateStr) => {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-                        const url = `https://${dateStr}.currency-api.pages.dev/v1/currencies/eur.json`;
-                        try {
-                            const response = await fetch(url, { signal: controller.signal });
-                            if (response.status === 404) throw new Error('Not Found (404)');
-                            if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
-                            const data = await response.json();
-                            if (!data.eur) throw new Error(`No EUR data for ${dateStr} in API response.`);
-                            exchangeRates[dateStr] = data.eur;
-                            successfulFetches++;
-                        } catch (error) {
-                            console.error(`Error fetching rate for ${dateStr}:`, error.name === 'AbortError' ? 'Timeout' : error.message);
-                        } finally {
-                            clearTimeout(timeoutId);
-                        }
-                    });
-                    await Promise.all(promises);
-                }
-                
-                if (successfulFetches > 0) newRatesFetched = true;
-                hideLoading();
+        async function fetchAllExchangeRates(allTransactions) {
+            if (!window.ExchangeRateService) {
+                console.error('ExchangeRateService module not loaded.');
+                return { rates: {}, alerts: [{ type: 'error', message: 'Service initialization failed.' }] };
             }
 
-            const missingNeededRates = [...foreignCurrencyDates].filter(date => !exchangeRates[date] || exchangeRates[date] === null);
-            if (missingNeededRates.length > 0) {
-                localAlerts.push({
-                    type: 'warning',
-                    message: getTranslation('missingRatesWarning', { count: missingNeededRates.length })
-                });
-            }
+            const { rates, alerts } = await window.ExchangeRateService.fetchRatesForTransactions(allTransactions);
 
-            if (uniqueDates.length > 0) {
-                ratesInfoContainer.classList.remove('hidden');
-                downloadRatesBtn.disabled = false;
-                const hasMissingNeeded = missingNeededRates.length > 0;
-                
-                ratesLoadedInfo.textContent = newRatesFetched ? getTranslation('ratesUpdated') : getTranslation('ratesFromCache');
-                ratesLoadedInfo.className = 'text-sm mb-1 text-right dark:text-slate-400';
-                if (hasMissingNeeded) {
-                    ratesLoadedInfo.classList.add('text-red-600', 'dark:text-red-400', 'font-semibold');
-                } else {
-                    ratesLoadedInfo.classList.add('text-slate-500', 'dark:text-slate-400');
-                }
-                renderRatesAvailabilityGraph(uniqueDates, foreignCurrencyDates, hasMissingNeeded);
-            }
-
-            return { alerts: localAlerts };
+            return {
+                rates: rates,
+                alerts: alerts
+            };
         }
         
         /**
