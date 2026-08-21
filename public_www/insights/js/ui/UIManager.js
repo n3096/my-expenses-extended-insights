@@ -104,6 +104,15 @@ export class UIManager {
         if (y) y.value = state.filters.year;
         if (m) m.value = state.filters.month;
         if (c) c.value = state.ui.currencySelect;
+
+        this.setSelectValue('timeframe-select', state.filters.timelineTimeframe);
+        this.setSelectValue('timeline-mode-select', state.filters.timelineMode);
+        this.setSelectValue('comparison-data-type-select', state.filters.comparisonType);
+    }
+
+    static setSelectValue(id, value) {
+        const select = document.getElementById(id);
+        if (select) select.value = value;
     }
 
     static bindEvents() {
@@ -134,6 +143,14 @@ export class UIManager {
 
         document.getElementById('comparison-data-type-select')?.addEventListener('change', e => {
             AppStore.update({ filters: { comparisonType: e.target.value } });
+        });
+
+        document.getElementById('timeframe-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { timelineTimeframe: e.target.value } });
+        });
+
+        document.getElementById('timeline-mode-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { timelineMode: e.target.value } });
         });
 
         const filterBtn = document.getElementById('open-category-modal-btn');

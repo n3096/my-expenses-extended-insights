@@ -12,7 +12,8 @@ export const AppStore = {
             comparisonYears: [],
             comparisonType: 'net',
             comparisonChartType: 'bar',
-            showSubcategories: true
+            timelineTimeframe: '1y',
+            timelineMode: 'periodic'
         },
         ui: {
             currentLang: 'de',

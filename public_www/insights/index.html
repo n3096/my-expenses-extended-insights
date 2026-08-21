@@ -190,14 +190,37 @@
         </div>
 
         <div id="timeline-view" class="view-container space-y-6 hidden">
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-end">
+                <div class="flex flex-col gap-1">
+                    <label for="timeframe-select" class="text-xs font-medium text-slate-500 dark:text-slate-400" data-i18n-key="timeRange">Zeitbereich</label>
+                    <select id="timeframe-select" class="block w-40 pl-3 pr-10 py-2 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                        <option value="1m" data-i18n-key="timeframe1m">1 Monat</option>
+                        <option value="6m" data-i18n-key="timeframe6m">6 Monate</option>
+                        <option value="1y" data-i18n-key="timeframe1y">1 Jahr</option>
+                        <option value="2y" data-i18n-key="timeframe2y">2 Jahre</option>
+                        <option value="3y" data-i18n-key="timeframe3y">3 Jahre</option>
+                        <option value="5y" data-i18n-key="timeframe5y">5 Jahre</option>
+                        <option value="10y" data-i18n-key="timeframe10y">10 Jahre</option>
+                        <option value="max" data-i18n-key="timeframeMax">Max</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="timeline-mode-select" class="text-xs font-medium text-slate-500 dark:text-slate-400" data-i18n-key="timelineMode">Darstellung</label>
+                    <select id="timeline-mode-select" class="block w-40 pl-3 pr-10 py-2 text-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md">
+                        <option value="periodic" data-i18n-key="periodic">Periodisch</option>
+                        <option value="cumulative" data-i18n-key="cumulative">Kumulativ</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <h3 class="text-lg font-semibold mb-4">Kategorien im Zeitverlauf</h3>
+                <h3 class="text-lg font-semibold mb-4" data-i18n-key="timelineByCategory">Zeitverlauf nach Kategorien (gefiltert)</h3>
                 <div class="relative h-96">
                     <canvas id="category-timeline-chart"></canvas>
                 </div>
             </div>
             <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <h3 class="text-lg font-semibold mb-4">Netto-Überschuss Verlauf</h3>
+                <h3 class="text-lg font-semibold mb-4" data-i18n-key="totalNetTimeline">Gesamtverlauf Nettoergebnis (ungefiltert)</h3>
                 <div class="relative h-96">
                     <canvas id="net-timeline-chart"></canvas>
                 </div>
