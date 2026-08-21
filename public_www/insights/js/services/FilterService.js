@@ -1,25 +1,21 @@
 export class FilterService {
-    static getFilteredTransactions(transactions, filters) {
-        if (!transactions || !filters) return transactions || [];
+    static matchesPeriod(transaction, { year, month }) {
+        const date = new Date(transaction.date);
+        const yearMatches = year === 'all' || date.getFullYear().toString() === year;
+        const monthMatches = month === 'all'
+            || (date.getMonth() + 1).toString().padStart(2, '0') === String(month).padStart(2, '0');
+        return yearMatches && monthMatches;
+    }
 
-        return transactions.filter(t => {
-            const date = new Date(t.date);
-            const tYear = date.getFullYear().toString();
-            const tMonth = String(date.getMonth() + 1).padStart(2, '0');
+    static matchesCategory(transaction, { categories }) {
+        return categories.has(transaction.displayCategory);
+    }
 
-            if (filters.year !== 'all' && tYear !== filters.year) return false;
+    static byPeriod(transactions, filters) {
+        return transactions.filter(t => this.matchesPeriod(t, filters));
+    }
 
-            if (filters.month !== 'all' && tMonth !== filters.month.padStart(2, '0')) return false;
-
-            if (filters.categories && filters.categories.size > 0) {
-                if (!filters.categories.has(t.displayCategory)) return false;
-            }
-
-            if (filters.currencies && filters.currencies.size > 0) {
-                if (!filters.currencies.has(t.currency)) return false;
-            }
-
-            return true;
-        });
+    static byCategory(transactions, filters) {
+        return transactions.filter(t => this.matchesCategory(t, filters));
     }
 }

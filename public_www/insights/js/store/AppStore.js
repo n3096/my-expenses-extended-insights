@@ -1,4 +1,5 @@
 import { CurrencyService, DEFAULT_CURRENCY } from '../services/CurrencyService.js';
+import { FilterService } from '../services/FilterService.js';
 
 export const AppStore = {
     state: {
@@ -36,19 +37,14 @@ export const AppStore = {
     subscribe(callback) { this.listeners.push(callback); },
 
     update(newState) {
-        if (newState.exchangeRates) {
-            this.mergeRates(newState.exchangeRates);
-            delete newState.exchangeRates;
-        }
-
-        const ui = newState.ui ? { ...this.state.ui, ...newState.ui } : this.state.ui;
-        const filters = newState.filters ? { ...this.state.filters, ...newState.filters } : this.state.filters;
+        const { exchangeRates, ...rest } = newState;
+        if (exchangeRates) this.mergeRates(exchangeRates);
 
         this.state = {
             ...this.state,
-            ...newState,
-            ui,
-            filters
+            ...rest,
+            ui: rest.ui ? { ...this.state.ui, ...rest.ui } : this.state.ui,
+            filters: rest.filters ? { ...this.state.filters, ...rest.filters } : this.state.filters
         };
 
         this.processData();
@@ -81,16 +77,30 @@ export const AppStore = {
 
     getRate(dateStr, currency) {
         if (!currency || currency === DEFAULT_CURRENCY) return 1;
-        const d = new Date(dateStr);
-        const year = d.getUTCFullYear().toString();
-        const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
-        const day = d.getUTCDate().toString().padStart(2, '0');
-        const yearData = this.state.exchangeRates[year];
-        if (!yearData) return null;
-        const monthData = yearData[month];
+
+        // Transactions carry the local calendar day the booking happened on, so
+        // the rate has to be looked up with local date parts as well.
+        const date = new Date(dateStr);
+        const year = date.getFullYear().toString();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+
+        const monthData = this.state.exchangeRates[year]?.[month];
         if (!monthData) return null;
-        const rates = monthData[day] || monthData[Object.keys(monthData).sort()[0]];
-        return (rates && rates[currency]) ? rates[currency] : null;
+
+        const rates = monthData[day] ?? this.nearestDayRates(monthData, day);
+        return rates?.[currency] ?? null;
+    },
+
+    /** Weekends and holidays have no published rate, so fall back to the closest day. */
+    nearestDayRates(monthData, day) {
+        const days = Object.keys(monthData).sort();
+        if (!days.length) return null;
+        const target = Number(day);
+        const closest = days.reduce((best, current) =>
+            Math.abs(Number(current) - target) < Math.abs(Number(best) - target) ? current : best
+        );
+        return monthData[closest];
     },
 
     processData() {
@@ -111,16 +121,9 @@ export const AppStore = {
         this.state.processedTransactions = processed;
         this.state.missingRates = missingRates;
 
-        this.state.timeFilteredTransactions = this.state.processedTransactions.filter(t => {
-            const date = new Date(t.date);
-            const yearMatch = filters.year === 'all' || date.getFullYear().toString() === filters.year;
-            const monthMatch = filters.month === 'all' || (date.getMonth() + 1).toString().padStart(2, '0') === filters.month.padStart(2, '0');
-            return yearMatch && monthMatch;
-        });
-
-        const matchesCategory = t => filters.categories.has(t.displayCategory);
-        this.state.categoryFilteredTransactions = this.state.processedTransactions.filter(matchesCategory);
-        this.state.fullyFilteredTransactions = this.state.timeFilteredTransactions.filter(matchesCategory);
+        this.state.timeFilteredTransactions = FilterService.byPeriod(processed, filters);
+        this.state.categoryFilteredTransactions = FilterService.byCategory(processed, filters);
+        this.state.fullyFilteredTransactions = FilterService.byCategory(this.state.timeFilteredTransactions, filters);
     },
 
     notify() { this.listeners.forEach(cb => cb(this.state)); }
