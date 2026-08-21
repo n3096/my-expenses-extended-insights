@@ -327,6 +327,14 @@ export class I18nService {
         return pack[key] || key;
     }
 
+    /** Like get(), but replaces {placeholders} with the given values. */
+    static format(key, params = {}) {
+        return Object.entries(params).reduce(
+            (text, [name, value]) => text.replaceAll(`{${name}}`, value),
+            this.get(key)
+        );
+    }
+
     static updateDOM() {
         const elements = document.querySelectorAll('[data-i18n-key]');
         elements.forEach(el => {

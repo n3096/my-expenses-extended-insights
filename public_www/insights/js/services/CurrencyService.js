@@ -1,41 +1,62 @@
-import { AppStore } from '../store/AppStore.js';
+export const DEFAULT_CURRENCY = 'EUR';
 
+/**
+ * Converts transactions into the currency the user selected.
+ *
+ * The selection is encoded as `<CURRENCY>_<MODE>`:
+ *   - `EUR_CONVERTED` converts every transaction into EUR.
+ *   - `EUR_ONLY` keeps only the transactions that were booked in EUR.
+ */
 export class CurrencyService {
-    static processTransactions(transactions, exchangeRates, targetCurrency) {
-        if (!transactions) return [];
+    static parseSelection(selection) {
+        const [currency, mode] = String(selection ?? '').split('_');
+        return {
+            currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+            nativeOnly: mode === 'ONLY'
+        };
+    }
 
-        return transactions.map(t => {
-            let displayAmount = t.amount;
-            let displayCurrency = t.currency;
+    static currencyOf(transaction) {
+        return (transaction.currency || DEFAULT_CURRENCY).toUpperCase();
+    }
 
-            if (targetCurrency === 'EUR_CONVERTED') {
-                displayCurrency = 'EUR';
-                if (t.currency === 'JPY') {
-                    const dateStr = typeof t.date === 'string' ? t.date.split('T')[0] : t.date.toISOString().split('T')[0];
-                    const rate = exchangeRates[dateStr]?.JPY;
-                    displayAmount = rate ? t.amount / rate : t.amount / 160;
+    /**
+     * @param transactions raw transactions
+     * @param selection    value of the currency dropdown
+     * @param getRate      (isoDate, currency) => rate against the API base currency, or null
+     * @returns {{ transactions: Array, missingRates: number }}
+     */
+    static process(transactions, selection, getRate) {
+        const { currency: target, nativeOnly } = this.parseSelection(selection);
+        let missingRates = 0;
+
+        const processed = transactions
+            .filter(t => !nativeOnly || this.currencyOf(t) === target)
+            .map(t => {
+                const source = this.currencyOf(t);
+                let displayAmount = t.amount;
+                let rateMissing = false;
+
+                if (!nativeOnly && source !== target) {
+                    const sourceRate = getRate(t.date, source);
+                    const targetRate = getRate(t.date, target);
+                    if (sourceRate && targetRate) {
+                        displayAmount = (t.amount / sourceRate) * targetRate;
+                    } else {
+                        rateMissing = true;
+                        missingRates++;
+                    }
                 }
-            } else if (targetCurrency === 'JPY_CONVERTED') {
-                displayCurrency = 'JPY';
-                if (t.currency === 'EUR') {
-                    const dateStr = typeof t.date === 'string' ? t.date.split('T')[0] : t.date.toISOString().split('T')[0];
-                    const rate = exchangeRates[dateStr]?.JPY;
-                    displayAmount = rate ? t.amount * rate : t.amount * 160;
-                }
-            } else if (targetCurrency === 'EUR') {
-                if (t.currency !== 'EUR') displayAmount = 0;
-            } else if (targetCurrency === 'JPY') {
-                if (t.currency !== 'JPY') displayAmount = 0;
-            }
 
-            return {
-                ...t,
-                displayAmount,
-                displayCurrency,
-                displayCategory: t.displayCategory || t.mainCategory,
-                description: t.description || '',
-                account: t.account || ''
-            };
-        });
+                return {
+                    ...t,
+                    displayAmount,
+                    displayCurrency: nativeOnly ? source : target,
+                    displayCategory: t.category || 'Unkategorisiert',
+                    rateMissing
+                };
+            });
+
+        return { transactions: processed, missingRates };
     }
 }

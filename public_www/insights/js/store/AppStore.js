@@ -1,3 +1,5 @@
+import { CurrencyService, DEFAULT_CURRENCY } from '../services/CurrencyService.js';
+
 export const AppStore = {
     state: {
         transactions: [],
@@ -10,6 +12,8 @@ export const AppStore = {
         /** processedTransactions restricted to both year/month and categories. */
         fullyFilteredTransactions: [],
         exchangeRates: {},
+        /** Number of transactions that could not be converted for lack of a rate. */
+        missingRates: 0,
         filters: {
             year: 'all',
             month: 'all',
@@ -76,7 +80,7 @@ export const AppStore = {
     },
 
     getRate(dateStr, currency) {
-        if (!currency || currency === 'EUR') return 1;
+        if (!currency || currency === DEFAULT_CURRENCY) return 1;
         const d = new Date(dateStr);
         const year = d.getUTCFullYear().toString();
         const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
@@ -92,27 +96,20 @@ export const AppStore = {
     processData() {
         const { transactions, ui, filters } = this.state;
         if (!transactions.length) {
+            this.state.missingRates = 0;
             this.state.processedTransactions = [];
             this.state.timeFilteredTransactions = [];
             this.state.categoryFilteredTransactions = [];
             this.state.fullyFilteredTransactions = [];
             return;
         }
-        const targetCurrency = ui.currencySelect.split('_')[0].toUpperCase();
-        this.state.processedTransactions = transactions.map(t => {
-            const transCurrency = (t.currency || 'EUR').toUpperCase();
-            const sourceRate = this.getRate(t.date, transCurrency);
-            const targetRate = this.getRate(t.date, targetCurrency);
-            let displayAmount = t.amount;
-            if (sourceRate && targetRate) {
-                displayAmount = (t.amount / sourceRate) * targetRate;
-            }
-            return {
-                ...t,
-                displayAmount,
-                displayCategory: t.category || 'Unkategorisiert'
-            };
-        });
+        const { transactions: processed, missingRates } = CurrencyService.process(
+            transactions,
+            ui.currencySelect,
+            (date, currency) => this.getRate(date, currency)
+        );
+        this.state.processedTransactions = processed;
+        this.state.missingRates = missingRates;
 
         this.state.timeFilteredTransactions = this.state.processedTransactions.filter(t => {
             const date = new Date(t.date);

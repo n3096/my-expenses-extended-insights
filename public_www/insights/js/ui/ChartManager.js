@@ -1,5 +1,6 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
+import { CurrencyService } from '../services/CurrencyService.js';
 
 const WEEKS_IN_SHORT_TIMEFRAME = 5;
 
@@ -13,7 +14,7 @@ export class ChartManager {
     }
 
     static update(state) {
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
         const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency });
 
         if (state.ui.currentView === 'dashboard') {
@@ -158,7 +159,7 @@ export class ChartManager {
         const isDark = state.ui.theme === 'dark';
         const textColor = isDark ? '#94a3b8' : '#64748b';
         const gridColor = isDark ? '#334155' : '#e2e8f0';
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
 
         return {
             responsive: true,

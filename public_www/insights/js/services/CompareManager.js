@@ -1,6 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from './I18nService.js';
 import { escapeHtml } from '../utils/dom.js';
+import { CurrencyService } from './CurrencyService.js';
 
 export class CompareManager {
     static charts = new Map();
@@ -129,7 +130,7 @@ export class CompareManager {
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, state.ui.currencySelect.split('_')[0])}`
+                                label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, CurrencyService.parseSelection(state.ui.currencySelect).currency)}`
                             }
                         }
                     }
@@ -144,7 +145,7 @@ export class CompareManager {
     }
 
     static getOptions(state) {
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
         const isDark = state.ui.theme === 'dark';
         const textColor = isDark ? '#94a3b8' : '#64748b';
 

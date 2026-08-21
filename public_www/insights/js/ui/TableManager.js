@@ -1,5 +1,6 @@
 import { AppStore } from '../store/AppStore.js';
 import { escapeHtml } from '../utils/dom.js';
+import { CurrencyService } from '../services/CurrencyService.js';
 
 export class TableManager {
     static init() {
@@ -13,7 +14,7 @@ export class TableManager {
     }
 
     static render(state, searchTerm = '') {
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
         const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency });
 
         this.renderDashboardTable(state, formatter);

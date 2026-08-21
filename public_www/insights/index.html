@@ -92,6 +92,8 @@
             <button class="view-btn px-4 py-2 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none transition-colors" data-view="transactions" data-i18n-key="viewTransactions">Transaktionen</button>
         </div>
 
+        <div id="missing-rates-warning" class="hidden mb-6 p-4 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300"></div>
+
         <div id="global-filter-row" class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6 flex flex-wrap gap-4 items-center">
 
             <div class="flex flex-col gap-1">
@@ -123,10 +125,10 @@
             <div class="flex flex-col gap-1">
                 <label for="currency-select" class="text-xs font-medium text-slate-500 dark:text-slate-400" data-i18n-key="currencyLabel">Währung</label>
                 <select id="currency-select" class="block w-48 pl-3 pr-10 py-2 text-base border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                    <option value="EUR_CONVERTED">EUR (Umgerechnet)</option>
-                    <option value="EUR_ONLY">Nur EUR</option>
-                    <option value="JPY_CONVERTED">JPY (Umgerechnet)</option>
-                    <option value="JPY_ONLY">Nur JPY</option>
+                    <option value="EUR_CONVERTED" data-i18n-key="currencyEurConverted">EUR (umgerechnet)</option>
+                    <option value="EUR_ONLY" data-i18n-key="currencyEurOnly">Nur EUR</option>
+                    <option value="JPY_CONVERTED" data-i18n-key="currencyJpyConverted">JPY (umgerechnet)</option>
+                    <option value="JPY_ONLY" data-i18n-key="currencyJpyOnly">Nur JPY</option>
                 </select>
             </div>
 

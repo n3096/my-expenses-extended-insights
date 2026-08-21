@@ -20,6 +20,7 @@ export class UIManager {
             this.syncComparisonYears(state);
             this.updateViewVisibility(state.ui.currentView);
             this.renderCategoryModalList(state);
+            this.renderMissingRatesWarning(state);
             I18nService.updateDOM();
         }
     }
@@ -47,6 +48,16 @@ export class UIManager {
         container.querySelectorAll('.cat-filter-cb').forEach(cb => {
             cb.checked = state.filters.categories.has(cb.value);
         });
+    }
+
+    static renderMissingRatesWarning(state) {
+        const banner = document.getElementById('missing-rates-warning');
+        if (!banner) return;
+
+        banner.classList.toggle('hidden', state.missingRates === 0);
+        if (state.missingRates > 0) {
+            banner.textContent = I18nService.format('missingRatesWarning', { count: state.missingRates });
+        }
     }
 
     /** All categories present in the uploaded file, independent of the active filters. */
