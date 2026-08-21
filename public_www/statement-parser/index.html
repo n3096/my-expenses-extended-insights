@@ -8,9 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- PDF.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs" type="module"></script>
-
     <script>
         tailwind.config = { darkMode: 'class' }
     </script>
@@ -124,8 +121,12 @@
 
 <script type="module">
     // --- PDF.js Setup ---
-    const { pdfjsLib } = globalThis;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs`;
+    // pdf.js ships as an ES module, so it has to be imported - it does not
+    // register itself on `globalThis`.
+    import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs';
+
+    const PDFJS_VERSION = '4.3.136';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
 
     // --- DOM Elements ---
     const themeToggle = document.getElementById('theme-toggle');
@@ -729,7 +730,7 @@
             let parsedData;
             if (isPdf) {
                 const typedarray = new Uint8Array(await file.arrayBuffer());
-                const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
                 let fullText = '';
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
