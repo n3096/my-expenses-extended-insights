@@ -1,6 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { escapeHtml } from '../utils/dom.js';
 import { CurrencyService } from '../services/CurrencyService.js';
+import { I18nService } from '../services/I18nService.js';
 
 export class TableManager {
     static init() {
@@ -34,7 +35,7 @@ export class TableManager {
 
             tbody.innerHTML = filtered.map(t => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm">
-                    <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${new Date(t.date).toLocaleDateString()}</td>
+                    <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${I18nService.formatDate(t.date)}</td>
                     <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(t.displayCategory)}</td>
                     <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${escapeHtml(t.description || '-')}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}">
@@ -85,6 +86,11 @@ export class TableManager {
             else cats[t.displayCategory].exp += t.displayAmount;
         });
 
+        if (Object.keys(cats).length === 0) {
+            container.innerHTML = `<p class="text-sm text-slate-500 dark:text-slate-400" data-i18n-key="noCategoryData">${escapeHtml(I18nService.get('noCategoryData'))}</p>`;
+            return;
+        }
+
         container.innerHTML = Object.entries(cats)
             .sort((a, b) => b[1].exp - a[1].exp)
             .map(([name, val]) => {
@@ -94,16 +100,16 @@ export class TableManager {
                     <h4 class="font-bold text-slate-900 dark:text-white mb-3 truncate" title="${escapeHtml(name)}">${escapeHtml(name)}</h4>
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
-                            <span class="text-slate-500 dark:text-slate-400">Einnahmen:</span>
+                            <span class="text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('income'))}</span>
                             <span class="text-green-600 font-medium">${val.inc > 0 ? formatter.format(val.inc) : '-'}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-slate-500 dark:text-slate-400">Ausgaben:</span>
+                            <span class="text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('expenses'))}</span>
                             <span class="text-red-600 font-medium">${val.exp > 0 ? formatter.format(val.exp) : '-'}</span>
                         </div>
                     </div>
                     <div class="flex justify-between text-sm mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <span class="font-medium text-slate-700 dark:text-slate-300">Netto:</span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">${escapeHtml(I18nService.get('net'))}</span>
                         <span class="font-bold whitespace-nowrap ${net >= 0 ? 'text-green-600' : 'text-red-600'}">${formatter.format(net)}</span>
                     </div>
                 </div>

@@ -1,20 +1,17 @@
 import { AppStore } from '../store/AppStore.js';
 
+export const DEFAULT_LANG = 'de';
+export const LOCALES = { de: 'de-DE', en: 'en-US', ja: 'ja-JP' };
+export const SUPPORTED_LANGS = Object.keys(LOCALES);
+
 export class I18nService {
     static translations = {
         de: {
             pageTitle: "My Expenses - Erweiterte Einblicke",
-            dashboardTitle: "My Expenses - Erweiterte Einblicke",
-            dashboardSubtitle: "Laden Sie Ihre CSV-Datei hoch, um eine detaillierte Analyse zu erhalten.",
             loadingMessage: "Lade Daten...",
-            uploadRatesTitle: "Schritt 1 (Optional): Wechselkurse laden",
-            uploadRatesSubtitle: "Laden Sie eine vorhandene `exchange_rates.json`-Datei, um API-Anfragen zu sparen.",
-            selectJsonFile: "JSON-Datei auswählen",
-            ratesUploadSuccess: "✓ Wechselkurse erfolgreich geladen.",
             uploadCsvTitle: "Schritt 2: Transaktionen hochladen",
             uploadCsvSubtitle: "Ziehen Sie Ihre CSV-Datei hierher oder klicken Sie zum Auswählen.",
             selectCsvFile: "CSV-Datei auswählen",
-            uploadTitle: "Schritt 1: My Expenses CSV hochladen",
             apiChecking: "Prüfe Status...",
             apiOnline: "Kurs-API online",
             apiOffline: "Kurs-API offline",
@@ -29,21 +26,23 @@ export class I18nService {
             currencyJpyOnly: "Nur JPY",
             yearLabel: "Jahr",
             monthLabel: "Monat",
-            showSubcategories: "Unterkategorien anzeigen",
             filterCategories: "Kategorien filtern",
-            saveRates: "Kurse speichern",
             uploadNewFile: "Neue Datei hochladen",
             income: "Einnahmen",
             expenses: "Ausgaben",
             netResult: "Nettoergebnis",
-            expensesByCategory: "Ausgaben nach Kategorie",
             noExpenseData: "Keine Ausgabendaten für diesen Zeitraum vorhanden.",
             transactions: "Transaktionen",
-            noTransactions: "Keine Transaktionen für diesen Zeitraum vorhanden.",
-            detailedCategoryView: "Detaillierte Kategorienübersicht",
             category: "Kategorie",
             net: "Netto",
             timelineByCategory: "Zeitverlauf nach Kategorien (gefiltert)",
+            selectCategories: "Kategorien wählen",
+            noCategoryData: "Keine detaillierten Kategoriedaten geladen.",
+            comparisonNet: "Netto",
+            comparisonIncome: "Nur Einnahmen",
+            originalAmount: "Original",
+            search: "Suchen...",
+            uploadError: "Die CSV-Datei konnte nicht gelesen werden.",
             selectAll: "Alle auswählen",
             deselectAll: "Alle abwählen",
             periodic: "Periodisch",
@@ -57,50 +56,23 @@ export class I18nService {
             timeframe10y: "10 Jahre",
             timeframeMax: "Max",
             totalNetTimeline: "Gesamtverlauf Nettoergebnis (ungefiltert)",
-            transactionList: "Transaktionsliste",
-            resetFilter: "Filter zurücksetzen",
             timeRange: "Zeitbereich",
-            timeRangeAll: "Gesamt",
-            timeRangeTimeline: "Wie Zeitverlauf",
-            timeRangeCustom: "Benutzerdefiniert",
-            dateFrom: "Von",
-            dateTo: "Bis",
             date: "Datum",
             description: "Beschreibung",
-            account: "Konto",
             amount: "Betrag",
             noTransactionsForFilter: "Keine Transaktionen für diesen Zeitraum und Filter vorhanden.",
-            apply: "Anwenden",
-            uncategorized: "Unkategorisiert",
-            ratesUpdated: "Wechselkurse aktualisiert.",
-            ratesFromCache: "Wechselkurse aus Cache.",
-            fetchRatesError: "Bitte wählen Sie eine gültige JSON-Datei aus.",
-            parseRatesError: "Fehler beim Parsen der JSON-Datei.",
-            readRatesError: "Fehler beim Lesen der Raten-Datei.",
-            fetchCsvError: "Bitte wählen Sie eine gültige CSV-Datei aus.",
-            processCsvError: "Fehler bei der Verarbeitung der Daten.",
-            readCsvError: "Fehler beim Lesen der CSV-Datei.",
             emptyCsvError: "Die CSV-Datei ist leer oder es konnten keine gültigen Transaktionen gefunden werden.",
-            csvHeaderError: "CSV muss Spalten für Datum und einen Betrag (oder Einnahmen/Ausgaben) enthalten. Gefundene Spalten: ",
-            splitTransactionWarning: "Diskrepanz bei Split-Buchung in CSV-Zeile {line}: Summe der Splits ({sum}) ungleich dem Eltern-Betrag ({amount}).",
             missingRatesWarning: "{count} benötigte Wechselkurse konnten nicht geladen werden. Beträge in Fremdwährung sind möglicherweise unvollständig.",
-            uncategorizedInfo: "Es wurden {count} unkategorisierte Transaktionen gefunden.",
-            assignNow: "Jetzt zuweisen",
-            loadingCsv: "Verarbeite CSV...",
-            loadingRates: "Lade Wechselkurse...",
-            loadingRatesProgress: "Lade Kurse {start}-{end} von {total}...",
             months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
             yearAll: "Alle Jahre",
             monthAll: "Alle Monate",
             timelineMode: "Darstellung",
-            comparisonTitle: "Jahresvergleich",
             selectYears: "Jahre zum Vergleichen auswählen:",
-            noComparisonData: "Bitte wählen Sie mindestens zwei Jahre aus, um einen Vergleich zu sehen.",
+            noComparisonData: "Bitte wählen Sie mindestens ein Jahr aus.",
             comparisonDeviationTitle: "Top 10 Kategorie-Abweichungen",
             noComparisonDeviationData: "Nicht genügend Daten für einen Abweichungsvergleich vorhanden (mind. 2 Jahre benötigt).",
             barChart: "Balkendiagramm",
             pieCharts: "Kreisdiagramme",
-
             incomeTitle: "Einnahmen",
             expenseTitle: "Ausgaben",
             netTitle: "Ersparnis",
@@ -110,17 +82,10 @@ export class I18nService {
         },
         en: {
             pageTitle: "My Expenses - Extended Insight",
-            dashboardTitle: "My Expenses - Extended Insight",
-            dashboardSubtitle: "Upload your CSV file to get a detailed analysis.",
             loadingMessage: "Loading data...",
-            uploadRatesTitle: "Step 1 (Optional): Load Exchange Rates",
-            uploadRatesSubtitle: "Load an existing `exchange_rates.json` file to save API requests.",
-            selectJsonFile: "Select JSON file",
-            ratesUploadSuccess: "✓ Exchange rates loaded successfully.",
             uploadCsvTitle: "Step 2: Upload Transactions",
             uploadCsvSubtitle: "Drag and drop your CSV file here or click to select.",
             selectCsvFile: "Select CSV file",
-            uploadTitle: "Step 1: Upload My Expenses CSV",
             apiChecking: "Checking status...",
             apiOnline: "Rate API online",
             apiOffline: "Rate API offline",
@@ -135,21 +100,23 @@ export class I18nService {
             currencyJpyOnly: "JPY only",
             yearLabel: "Year",
             monthLabel: "Month",
-            showSubcategories: "Show subcategories",
             filterCategories: "Filter categories",
-            saveRates: "Save rates",
             uploadNewFile: "Upload new file",
             income: "Income",
             expenses: "Expenses",
             netResult: "Net result",
-            expensesByCategory: "Expenses by Category",
             noExpenseData: "No expense data available for this period.",
             transactions: "Transactions",
-            noTransactions: "No transactions available for this period.",
-            detailedCategoryView: "Detailed Category View",
             category: "Category",
             net: "Net",
             timelineByCategory: "Timeline by Category (filtered)",
+            selectCategories: "Choose categories",
+            noCategoryData: "No detailed category data loaded.",
+            comparisonNet: "Net",
+            comparisonIncome: "Income only",
+            originalAmount: "Original",
+            search: "Search...",
+            uploadError: "The CSV file could not be read.",
             selectAll: "Select all",
             deselectAll: "Deselect all",
             periodic: "Periodic",
@@ -163,50 +130,23 @@ export class I18nService {
             timeframe10y: "10 years",
             timeframeMax: "Max",
             totalNetTimeline: "Total Net Result Timeline (unfiltered)",
-            transactionList: "Transaction List",
-            resetFilter: "Reset filter",
             timeRange: "Time range",
-            timeRangeAll: "All",
-            timeRangeTimeline: "Like timeline",
-            timeRangeCustom: "Custom",
-            dateFrom: "From",
-            dateTo: "To",
             date: "Date",
             description: "Description",
-            account: "Account",
             amount: "Amount",
             noTransactionsForFilter: "No transactions for this period and filter.",
-            apply: "Apply",
-            uncategorized: "Uncategorized",
-            ratesUpdated: "Exchange rates updated.",
-            ratesFromCache: "Exchange rates from cache.",
-            fetchRatesError: "Please select a valid JSON file.",
-            parseRatesError: "Error parsing the JSON file.",
-            readRatesError: "Error reading the rates file.",
-            fetchCsvError: "Please select a valid CSV file.",
-            processCsvError: "Error processing data.",
-            readCsvError: "Error reading the CSV file.",
             emptyCsvError: "The CSV file is empty or no valid transactions could be found.",
-            csvHeaderError: "CSV must contain columns for date and an amount (or income/expense). Found columns: ",
-            splitTransactionWarning: "Discrepancy in split transaction on CSV line {line}: Sum of splits ({sum}) does not equal parent amount ({amount}).",
             missingRatesWarning: "{count} required exchange rates could not be loaded. Amounts in foreign currency may be incomplete.",
-            uncategorizedInfo: "Found {count} uncategorized transactions.",
-            assignNow: "Assign now",
-            loadingCsv: "Processing CSV...",
-            loadingRates: "Fetching exchange rates...",
-            loadingRatesProgress: "Fetching rates {start}-{end} of {total}...",
             months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
             yearAll: "All years",
             monthAll: "All months",
             timelineMode: "Display",
-            comparisonTitle: "Yearly Comparison",
             selectYears: "Select years to compare:",
-            noComparisonData: "Please select at least two years to see a comparison.",
+            noComparisonData: "Please select at least one year.",
             comparisonDeviationTitle: "Top 10 Category Deviations",
             noComparisonDeviationData: "Not enough data for a deviation comparison (min. 2 years required).",
             barChart: "Bar Chart",
             pieCharts: "Pie Charts",
-
             incomeTitle: "Income",
             expenseTitle: "Expenses",
             netTitle: "Savings",
@@ -216,17 +156,10 @@ export class I18nService {
         },
         ja: {
             pageTitle: "My Expenses - 詳細な洞察",
-            dashboardTitle: "My Expenses - 詳細な洞察",
-            dashboardSubtitle: "CSVファイルをアップロードして詳細な分析を取得します。",
             loadingMessage: "データを読み込み中...",
-            uploadRatesTitle: "ステップ1（任意）：為替レートを読み込む",
-            uploadRatesSubtitle: "既存の `exchange_rates.json` ファイルを読み込んでAPIリクエストを節約します。",
-            selectJsonFile: "JSONファイルを選択",
-            ratesUploadSuccess: "✓ 為替レートが正常に読み込まれました。",
             uploadCsvTitle: "ステップ2：取引をアップロード",
             uploadCsvSubtitle: "CSVファイルをここにドラッグ＆ドロップするか、クリックして選択します。",
             selectCsvFile: "CSVファイルを選択",
-            uploadTitle: "ステップ1：My Expenses CSVをアップロード",
             apiChecking: "ステータスを確認中...",
             apiOnline: "レートAPI オンライン",
             apiOffline: "レートAPI オフライン",
@@ -241,21 +174,23 @@ export class I18nService {
             currencyJpyOnly: "JPYのみ",
             yearLabel: "年",
             monthLabel: "月",
-            showSubcategories: "サブカテゴリを表示",
             filterCategories: "カテゴリをフィルター",
-            saveRates: "レートを保存",
             uploadNewFile: "新しいファイルをアップロード",
             income: "収入",
             expenses: "支出",
             netResult: "純損益",
-            expensesByCategory: "カテゴリ別支出",
             noExpenseData: "この期間の支出データはありません。",
             transactions: "取引",
-            noTransactions: "この期間の取引はありません。",
-            detailedCategoryView: "詳細カテゴリビュー",
             category: "カテゴリ",
             net: "純額",
             timelineByCategory: "カテゴリ別タイムライン（フィルター済み）",
+            selectCategories: "カテゴリを選択",
+            noCategoryData: "詳細なカテゴリデータがありません。",
+            comparisonNet: "純額",
+            comparisonIncome: "収入のみ",
+            originalAmount: "元の金額",
+            search: "検索...",
+            uploadError: "CSVファイルを読み込めませんでした。",
             selectAll: "すべて選択",
             deselectAll: "すべて選択解除",
             periodic: "定期的",
@@ -269,50 +204,23 @@ export class I18nService {
             timeframe10y: "10年",
             timeframeMax: "最大",
             totalNetTimeline: "総純損益タイムライン（フィルターなし）",
-            transactionList: "取引リスト",
-            resetFilter: "フィルターをリセット",
             timeRange: "期間",
-            timeRangeAll: "すべて",
-            timeRangeTimeline: "タイムラインと同じ",
-            timeRangeCustom: "カスタム",
-            dateFrom: "から",
-            dateTo: "まで",
             date: "日付",
             description: "説明",
-            account: "アカウント",
             amount: "金額",
             noTransactionsForFilter: "この期間とフィルターに該当する取引はありません。",
-            apply: "適用",
-            uncategorized: "未分類",
-            ratesUpdated: "為替レートが更新されました。",
-            ratesFromCache: "キャッシュから為替レートを取得しました。",
-            fetchRatesError: "有効なJSONファイルを選択してください。",
-            parseRatesError: "JSONファイルの解析中にエラーが発生しました。",
-            readRatesError: "レートファイルの読み取り中にエラーが発生しました。",
-            fetchCsvError: "有効なCSVファイルを選択してください。",
-            processCsvError: "データの処理中にエラーが発生しました。",
-            readCsvError: "CSVファイルの読み取り中にエラーが発生しました。",
             emptyCsvError: "CSVファイルが空か、有効な取引が見つかりませんでした。",
-            csvHeaderError: "CSVには日付と金額（または収入/支出）の列が必要です。見つかった列：",
-            splitTransactionWarning: "CSV行{line}の分割取引に不一致があります：分割の合計（{sum}）が親の金額（{amount}）と一致しません。",
             missingRatesWarning: "必要な為替レート{count}件が読み込めませんでした。外貨での金額が不完全な場合があります。",
-            uncategorizedInfo: "{count}件の未分類の取引が見つかりました。",
-            assignNow: "今すぐ割り当てる",
-            loadingCsv: "CSVを処理中...",
-            loadingRates: "為替レートを取得中...",
-            loadingRatesProgress: "{total}件中{start}-{end}件のレートを取得中...",
             months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
             yearAll: "すべての年",
             monthAll: "すべての月",
             timelineMode: "表示",
-            comparisonTitle: "年次比較",
             selectYears: "比較する年を選択してください：",
-            noComparisonData: "比較を表示するには、少なくとも2つの年を選択してください。",
+            noComparisonData: "少なくとも1つの年を選択してください。",
             comparisonDeviationTitle: "トップ10のカテゴリ乖離",
             noComparisonDeviationData: "乖離比較に十分なデータがありません（最低2年必要）。",
             barChart: "棒グラフ",
             pieCharts: "円グラフ",
-
             incomeTitle: "収入",
             expenseTitle: "支出",
             netTitle: "貯蓄",
@@ -328,9 +236,7 @@ export class I18nService {
     }
 
     static get(key) {
-        const lang = AppStore.state.ui.currentLang || 'de';
-        const pack = this.translations[lang] || this.translations['de'];
-        return pack[key] || key;
+        return this.translations[this.currentLang()][key] ?? this.translations[DEFAULT_LANG][key] ?? key;
     }
 
     /** Like get(), but replaces {placeholders} with the given values. */
@@ -342,21 +248,34 @@ export class I18nService {
     }
 
     static updateDOM() {
-        const elements = document.querySelectorAll('[data-i18n-key]');
-        elements.forEach(el => {
-            const key = el.getAttribute('data-i18n-key');
-            const translation = this.get(key);
-            if (el.tagName === 'INPUT' && el.placeholder) {
-                el.placeholder = translation;
-            } else {
-                el.textContent = translation;
-            }
+        document.querySelectorAll('[data-i18n-key]').forEach(el => {
+            const translation = this.get(el.dataset.i18nKey);
+            if (el.tagName === 'INPUT') el.placeholder = translation;
+            else el.textContent = translation;
         });
+
+        const months = this.get('months');
+        document.querySelectorAll('[data-i18n-month]').forEach(el => {
+            el.textContent = months[Number(el.dataset.i18nMonth)];
+        });
+
+        document.documentElement.lang = this.currentLang();
+    }
+
+    static currentLang() {
+        const lang = AppStore.state.ui.currentLang;
+        return this.translations[lang] ? lang : DEFAULT_LANG;
+    }
+
+    static locale() {
+        return LOCALES[this.currentLang()];
     }
 
     static formatCurrency(amount, currency) {
-        const lang = AppStore.state.ui.currentLang || 'de';
-        const locale = lang === 'ja' ? 'ja-JP' : (lang === 'en' ? 'en-US' : 'de-DE');
-        return new Intl.NumberFormat(locale, { style: 'currency', currency: currency }).format(amount);
+        return new Intl.NumberFormat(this.locale(), { style: 'currency', currency }).format(amount);
+    }
+
+    static formatDate(date) {
+        return new Date(date).toLocaleDateString(this.locale());
     }
 }

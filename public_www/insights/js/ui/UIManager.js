@@ -21,8 +21,20 @@ export class UIManager {
             this.updateViewVisibility(state.ui.currentView);
             this.renderCategoryModalList(state);
             this.renderMissingRatesWarning(state);
-            I18nService.updateDOM();
         }
+
+        // Runs for the upload screen too - the language can be switched before
+        // a file has been picked.
+        I18nService.updateDOM();
+        const langSwitcher = document.getElementById('lang-switcher');
+        if (langSwitcher) langSwitcher.value = state.ui.currentLang;
+    }
+
+    static showUploadError(messageKey) {
+        const el = document.getElementById('upload-error');
+        if (!el) return;
+        el.textContent = messageKey ? I18nService.get(messageKey) : '';
+        el.classList.toggle('hidden', !messageKey);
     }
 
     static renderCategoryModalList(state) {
@@ -69,31 +81,27 @@ export class UIManager {
         const container = document.getElementById('comparison-year-selector');
         if (!container) return;
 
-        const years = [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a,b) => b-a);
+        const years = this.getYears(state);
         const colors = CompareManager.getColors();
 
-        if (container.children.length === years.length) return;
-
-        container.innerHTML = years.map((yr, idx) => {
-            const color = colors[idx % colors.length];
-            const isChecked = state.filters.comparisonYears.includes(yr.toString());
-            return `
-                <div class="relative">
-                    <input type="checkbox" id="yr-${yr}" class="year-checkbox" value="${yr}" ${isChecked ? 'checked' : ''}>
-                    <label for="yr-${yr}" class="year-checkbox-label flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-full" style="background-color: ${color}"></span>
-                        ${yr}
-                    </label>
-                </div>
-            `;
-        }).join('');
+        if (container.dataset.years !== years.join(',')) {
+            container.dataset.years = years.join(',');
+            container.innerHTML = years.map((yr, idx) => `
+                <label class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <input type="checkbox" class="year-checkbox w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" value="${yr}">
+                    <span class="w-3 h-3 rounded-full" style="background-color: ${colors[idx % colors.length]}"></span>
+                    ${yr}
+                </label>
+            `).join('');
+        }
 
         container.querySelectorAll('.year-checkbox').forEach(cb => {
-            cb.addEventListener('change', () => {
-                const checked = Array.from(container.querySelectorAll('.year-checkbox:checked')).map(c => c.value);
-                AppStore.update({ filters: { comparisonYears: checked } });
-            });
+            cb.checked = state.filters.comparisonYears.includes(cb.value);
         });
+    }
+
+    static getYears(state) {
+        return [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a, b) => b - a);
     }
 
     static updateTheme(theme) {
@@ -113,10 +121,13 @@ export class UIManager {
         const m = document.getElementById('month-select');
         const c = document.getElementById('currency-select');
 
-        if (y && y.options.length <= 1) {
-            const years = [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a,b) => b-a);
-            y.innerHTML = `<option value="all">${I18nService.get('yearAll')}</option>`;
-            years.forEach(yr => y.add(new Option(yr, yr)));
+        if (y) {
+            const years = this.getYears(state);
+            if (y.dataset.years !== years.join(',')) {
+                y.dataset.years = years.join(',');
+                y.innerHTML = '<option value="all" data-i18n-key="yearAll"></option>';
+                years.forEach(yr => y.add(new Option(yr, yr)));
+            }
         }
 
         if (y) y.value = state.filters.year;
@@ -174,6 +185,12 @@ export class UIManager {
         const filterBtn = document.getElementById('open-category-modal-btn');
         const categoryModal = document.getElementById('category-modal');
         const closeBtn = document.getElementById('close-category-modal-btn');
+
+        document.getElementById('comparison-year-selector')?.addEventListener('change', (e) => {
+            if (!e.target.classList.contains('year-checkbox')) return;
+            const checked = [...e.currentTarget.querySelectorAll('.year-checkbox:checked')].map(c => c.value);
+            AppStore.update({ filters: { comparisonYears: checked } });
+        });
 
         document.getElementById('category-list-container')?.addEventListener('change', (e) => {
             if (!e.target.classList.contains('cat-filter-cb')) return;
