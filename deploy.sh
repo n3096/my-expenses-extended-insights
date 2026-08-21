@@ -5,8 +5,13 @@ set -e
 echo "⚙️  Loading configuration..."
 
 # Load environment variables from the deploy.env file if it exists.
+# Sourcing it keeps values containing spaces intact; word splitting the file
+# through xargs did not.
 if [ -f "deploy.env" ]; then
-  export $(cat deploy.env | sed 's/#.*//g' | xargs)
+  set -a
+  # shellcheck disable=SC1091
+  . ./deploy.env
+  set +a
 fi
 
 # Check for required variables, using the defined suffix for error messages.
