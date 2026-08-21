@@ -1,4 +1,5 @@
 import { AppStore } from '../store/AppStore.js';
+import { escapeHtml } from '../utils/dom.js';
 
 export class TableManager {
     static init() {
@@ -33,8 +34,8 @@ export class TableManager {
             tbody.innerHTML = filtered.map(t => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm">
                     <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${new Date(t.date).toLocaleDateString()}</td>
-                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${t.displayCategory}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${t.description || '-'}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(t.displayCategory)}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${escapeHtml(t.description || '-')}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}">
                         ${t.type === 'income' ? '+' : '-'}${formatter.format(t.displayAmount)}
                     </td>
@@ -62,7 +63,7 @@ export class TableManager {
             .sort((a,b) => b[1].exp - a[1].exp)
             .map(([name, val]) => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${name}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(name)}</td>
                     <td class="px-6 py-4 text-right text-green-600 whitespace-nowrap">${val.inc > 0 ? formatter.format(val.inc) : '-'}</td>
                     <td class="px-6 py-4 text-right text-red-600 whitespace-nowrap">${val.exp > 0 ? formatter.format(val.exp) : '-'}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap">${formatter.format(val.inc - val.exp)}</td>
@@ -89,7 +90,7 @@ export class TableManager {
                 const net = val.inc - val.exp;
                 return `
                 <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
-                    <h4 class="font-bold text-slate-900 dark:text-white mb-3 truncate" title="${name}">${name}</h4>
+                    <h4 class="font-bold text-slate-900 dark:text-white mb-3 truncate" title="${escapeHtml(name)}">${escapeHtml(name)}</h4>
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
                             <span class="text-slate-500 dark:text-slate-400">Einnahmen:</span>

@@ -1,5 +1,6 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from './I18nService.js';
+import { escapeHtml } from '../utils/dom.js';
 
 export class CompareManager {
     static charts = new Map();
@@ -109,7 +110,7 @@ export class CompareManager {
         years.forEach((year) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl';
-            wrapper.innerHTML = `<h3 class="text-center font-bold mb-2 text-slate-800 dark:text-slate-200">${year}</h3><canvas id="pie-${year}"></canvas>`;
+            wrapper.innerHTML = `<h3 class="text-center font-bold mb-2 text-slate-800 dark:text-slate-200">${escapeHtml(year)}</h3><canvas id="pie-${escapeHtml(year)}"></canvas>`;
             container.appendChild(wrapper);
 
             const yearData = {};
