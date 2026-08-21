@@ -197,9 +197,14 @@ export class ChartManager {
     }
 
     static draw(id, config) {
-        if (this.instances.has(id)) this.instances.get(id).destroy();
+        this.destroy(id);
         const canvas = document.getElementById(id);
         if (canvas) this.instances.set(id, new Chart(canvas, config));
+    }
+
+    static destroy(id) {
+        this.instances.get(id)?.destroy();
+        this.instances.delete(id);
     }
 
     static setTxt(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
@@ -266,6 +271,14 @@ export class ChartManager {
         if (!canvas) return;
         const cats = {};
         data.filter(t => t.type === 'expense').forEach(t => cats[t.displayCategory] = (cats[t.displayCategory] || 0) + t.displayAmount);
+
+        const isEmpty = Object.keys(cats).length === 0;
+        canvas.classList.toggle('hidden', isEmpty);
+        document.getElementById('no-expense-data')?.classList.toggle('hidden', !isEmpty);
+        if (isEmpty) {
+            this.destroy('expense-chart');
+            return;
+        }
 
         this.draw('expense-chart', {
             type: 'doughnut',

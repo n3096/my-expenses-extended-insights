@@ -33,6 +33,11 @@ export class TableManager {
                 );
             }
 
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('noTransactionsForFilter'))}</td></tr>`;
+                return;
+            }
+
             tbody.innerHTML = filtered.map(t => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm">
                     <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${I18nService.formatDate(t.date)}</td>

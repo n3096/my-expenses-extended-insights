@@ -37,10 +37,10 @@ class App {
         UIManager.setLoading(true);
 
         try {
-            const { transactions } = TransactionParser.parse(await file.text());
+            const { transactions, error } = TransactionParser.parse(await file.text());
 
-            if (transactions.length === 0) {
-                UIManager.showUploadError('emptyCsvError');
+            if (error) {
+                UIManager.showUploadError(error);
                 return;
             }
 
