@@ -167,7 +167,8 @@
             filterFrom: "Von:",
             filterTo: "Bis:",
             errorFileType: "Bitte eine PDF- oder CSV-Datei hochladen.",
-            errorUnsupportedCSV: "Dieses CSV-Format wird nicht unterstützt."
+            errorUnsupportedCSV: "Dieses CSV-Format wird nicht unterstützt.",
+            errorUnsupportedPDF: "Dieses PDF-Format wird nicht unterstützt."
         },
         en: {
             pageTitle: "Statement Parser - My Expenses - Extended Insights",
@@ -188,7 +189,8 @@
             filterFrom: "From:",
             filterTo: "To:",
             errorFileType: "Please upload a PDF or CSV file.",
-            errorUnsupportedCSV: "This CSV format is not supported."
+            errorUnsupportedCSV: "This CSV format is not supported.",
+            errorUnsupportedPDF: "This PDF format is not supported."
         },
         ja: {
             pageTitle: "明細パーサー - My Expenses - 詳細な洞察",
@@ -209,10 +211,20 @@
             filterFrom: "から:",
             filterTo: "まで:",
             errorFileType: "PDFまたはCSVファイルをアップロードしてください。",
-            errorUnsupportedCSV: "このCSV形式はサポートされていません。"
+            errorUnsupportedCSV: "このCSV形式はサポートされていません。",
+            errorUnsupportedPDF: "このPDF形式はサポートされていません。"
         }
     };
-    const getTranslation = (key) => translations[currentLang]?.[key] || translations.de[key];
+    const LOCALES = { de: 'de-DE', en: 'en-US', ja: 'ja-JP' };
+    const SUPPORTED_LANGS = Object.keys(LOCALES);
+
+    const getTranslation = (key) => translations[currentLang]?.[key] ?? translations.de[key] ?? key;
+    const getLocale = () => LOCALES[currentLang] ?? LOCALES.de;
+    const formatAmount = (amount, currency) =>
+        new Intl.NumberFormat(getLocale(), { style: 'currency', currency }).format(amount);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
     const updateText = () => {
         document.querySelectorAll('[data-i18n-key]').forEach(el => {
             el.textContent = getTranslation(el.dataset.i18nKey);
@@ -227,7 +239,7 @@
     };
     const initializeLanguage = () => {
         const savedLang = localStorage.getItem('language') || navigator.language.split('-')[0];
-        setLanguage(['de', 'en', 'ja'].includes(savedLang) ? savedLang : 'de');
+        setLanguage(SUPPORTED_LANGS.includes(savedLang) ? savedLang : 'de');
     };
 
     // --- Theme Management ---
@@ -285,6 +297,14 @@
     }
 
     // --- App Logic ---
+    class UnsupportedFormatError extends Error {
+        constructor(translationKey) {
+            super(translationKey);
+            this.name = 'UnsupportedFormatError';
+            this.translationKey = translationKey;
+        }
+    }
+
     function showError(messageKey) {
         uploadError.textContent = getTranslation(messageKey);
         uploadError.classList.remove('hidden');
@@ -630,18 +650,17 @@
                 txItem.onclick = () => txItem.classList.toggle('checked');
 
                 const isExpense = item.amount < 0;
-                const numberFormatter = new Intl.NumberFormat(currentLang.startsWith('de') ? 'de-DE' : 'en-US', { style: 'currency', currency: item.currency });
-                let formattedAmount = numberFormatter.format(item.amount);
-                if (item.amount > 0) {
-                    formattedAmount = `+${formattedAmount}`;
-                }
+                const formattedAmount = item.amount > 0
+                    ? `+${formatAmount(item.amount, item.currency)}`
+                    : formatAmount(item.amount, item.currency);
 
-                const bookingInfo = item.bookingDate !== item.transactionDate ? `<p class="text-xs text-slate-400 dark:text-slate-500">${getTranslation('bookedOn')} ${item.bookingDate}</p>` : '';
-                const extraInfoHTML = item.extraInfo ? `<p class="text-xs text-slate-400 dark:text-slate-500">${item.extraInfo}</p>` : '';
+                const bookingInfo = item.bookingDate !== item.transactionDate ? `<p class="text-xs text-slate-400 dark:text-slate-500">${escapeHtml(getTranslation('bookedOn'))} ${escapeHtml(item.bookingDate)}</p>` : '';
+                const extraInfoHTML = item.extraInfo ? `<p class="text-xs text-slate-400 dark:text-slate-500">${escapeHtml(item.extraInfo)}</p>` : '';
+                const description = escapeHtml(item.description);
 
                 txItem.innerHTML = `
                     <div class="flex-grow overflow-hidden pr-4">
-                        <p class="description font-medium text-slate-800 dark:text-slate-200 truncate" title="${item.description}">${item.description}</p>
+                        <p class="description font-medium text-slate-800 dark:text-slate-200 truncate" title="${description}">${description}</p>
                         ${bookingInfo}
                         ${extraInfoHTML}
                     </div>
@@ -653,10 +672,9 @@
             } else if (item.type === 'balance') {
                 const balanceItem = document.createElement('div');
                 balanceItem.className = 'balance-item p-3 rounded-lg flex justify-between items-center border-t border-b border-slate-200 dark:border-slate-700 my-2';
-                const formattedAmount = new Intl.NumberFormat(currentLang.startsWith('de') ? 'de-DE' : 'en-US', { style: 'currency', currency: item.currency }).format(item.amount);
                 balanceItem.innerHTML = `
-                    <p class="font-semibold text-sm italic text-slate-600 dark:text-slate-400">${item.description}</p>
-                    <p class="font-bold text-sm italic text-slate-700 dark:text-slate-300">${formattedAmount}</p>
+                    <p class="font-semibold text-sm italic text-slate-600 dark:text-slate-400">${escapeHtml(item.description)}</p>
+                    <p class="font-bold text-sm italic text-slate-700 dark:text-slate-300">${formatAmount(item.amount, item.currency)}</p>
                 `;
                 fragment.appendChild(balanceItem);
             }
@@ -747,14 +765,14 @@
                 } else if (fullText.includes("Hanseatic Bank")) {
                     parsedData = parseHanseaticBankStatement(fullText);
                 } else {
-                    throw new Error('Unsupported PDF format');
+                    throw new UnsupportedFormatError('errorUnsupportedPDF');
                 }
-            } else if (isCsv) {
+            } else {
                 const text = await file.text();
                 if (text.includes('Date & Time,Amount Outgoing (Yen)')) {
                     parsedData = parsePayPayStatement(text);
                 } else {
-                    throw new Error('Unsupported CSV format');
+                    throw new UnsupportedFormatError('errorUnsupportedCSV');
                 }
             }
 
@@ -765,7 +783,7 @@
             }
         } catch (error) {
             console.error('Error processing file:', error);
-            showError(error.message.includes('Unsupported') ? 'errorUnsupportedCSV' : 'errorProcessPDF');
+            showError(error instanceof UnsupportedFormatError ? error.translationKey : 'errorProcessPDF');
         } finally {
             hideLoading();
         }
@@ -786,7 +804,10 @@
         initializeTheme();
         initializeLanguage();
         themeToggle.addEventListener('click', toggleTheme);
-        langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
+        langSwitcher.addEventListener('change', (e) => {
+            setLanguage(e.target.value);
+            if (allParsedItems.length > 0) filterAndDisplay();
+        });
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         resetButton.addEventListener('click', resetApp);
         filterDateFrom.addEventListener('change', filterAndDisplay);
