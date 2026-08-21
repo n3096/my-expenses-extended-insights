@@ -16,6 +16,9 @@ class App {
             TableManager.init();
             CompareManager.init();
             this.bindEvents();
+
+            // Reports the API state up front instead of only after an upload.
+            ExchangeRateService.checkAvailability();
         } catch (e) { console.error(e); }
     }
 
@@ -33,7 +36,7 @@ class App {
         reader.onload = async (e) => {
             try {
                 const { transactions } = TransactionParser.parse(e.target.result);
-                await ExchangeRateService.checkAvailability();
+                if (!ExchangeRateService.isAvailable) await ExchangeRateService.checkAvailability();
                 const { rates } = await ExchangeRateService.fetchRatesForTransactions(transactions);
 
                 const allCats = [...new Set(transactions.map(t => t.category))];
