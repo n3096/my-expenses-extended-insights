@@ -2,12 +2,16 @@ import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
 import { escapeHtml } from '../utils/dom.js';
 import { colorAt } from './palette.js';
+import { Preferences, applyTheme } from '../../../assets/js/preferences.js';
 
 export class UIManager {
     static init() {
         this.bindEvents();
         AppStore.subscribe(state => this.render(state));
         this.updateTheme(AppStore.state.ui.theme);
+
+        // Paint the initial state; nothing has been dispatched to the store yet.
+        this.render(AppStore.state);
     }
 
     static render(state) {
@@ -104,10 +108,7 @@ export class UIManager {
     }
 
     static updateTheme(theme) {
-        const isDark = theme === 'dark';
-        document.documentElement.classList.toggle('dark', isDark);
-        document.getElementById('theme-icon-light')?.classList.toggle('hidden', isDark);
-        document.getElementById('theme-icon-dark')?.classList.toggle('hidden', !isDark);
+        applyTheme(theme);
     }
 
     static updateViewVisibility(view) {
@@ -145,12 +146,14 @@ export class UIManager {
 
     static bindEvents() {
         document.getElementById('theme-toggle')?.addEventListener('click', () => {
-            const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            const newTheme = AppStore.state.ui.theme === 'dark' ? 'light' : 'dark';
             this.updateTheme(newTheme);
+            Preferences.saveTheme(newTheme);
             AppStore.update({ ui: { theme: newTheme } });
         });
 
         document.getElementById('lang-switcher')?.addEventListener('change', (e) => {
+            Preferences.saveLanguage(e.target.value);
             AppStore.update({ ui: { currentLang: e.target.value } });
         });
 

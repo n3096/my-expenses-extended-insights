@@ -56,7 +56,8 @@
     <!-- Header -->
     <header class="mb-8 flex justify-between items-start gap-4">
         <div>
-            <h1 class="text-4xl font-bold text-slate-900 dark:text-white" data-i18n-key="mainTitle">Statement Parser</h1>
+            <a href="../index.html" class="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400" data-i18n-key="backToDashboard">← Dashboard</a>
+            <h1 class="text-4xl font-bold text-slate-900 dark:text-white mt-1" data-i18n-key="mainTitle">Statement Parser</h1>
             <p class="text-slate-500 dark:text-slate-400 mt-1" data-i18n-key="mainSubtitle">Lade einen Kontoauszug (PDF) hoch, um die Transaktionen zu extrahieren.</p>
         </div>
         <div class="flex items-center gap-2">
@@ -124,14 +125,13 @@
     // pdf.js ships as an ES module, so it has to be imported - it does not
     // register itself on `globalThis`.
     import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs';
+    import { createTranslator } from '../assets/js/i18n.js';
+    import { Preferences, initTheme } from '../assets/js/preferences.js';
 
     const PDFJS_VERSION = '4.3.136';
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
 
     // --- DOM Elements ---
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeIconLight = document.getElementById('theme-icon-light');
-    const themeIconDark = document.getElementById('theme-icon-dark');
     const langSwitcher = document.getElementById('lang-switcher');
     const uploadSection = document.getElementById('upload-section');
     const resultSection = document.getElementById('result-section');
@@ -146,11 +146,11 @@
     let allParsedItems = [];
 
     // --- i18n ---
-    let currentLang = 'de';
     const translations = {
         de: {
             pageTitle: "Statement Parser - My Expenses - Erweiterte Einblicke",
             loadingMessage: "PDF wird verarbeitet...",
+            backToDashboard: "← Dashboard",
             mainTitle: "Statement Parser",
             mainSubtitle: "Lade einen Kontoauszug (PDF) hoch, um die Transaktionen zu extrahieren.",
             uploadTitle: "Kontoauszug hochladen",
@@ -173,6 +173,7 @@
         en: {
             pageTitle: "Statement Parser - My Expenses - Extended Insights",
             loadingMessage: "Processing PDF...",
+            backToDashboard: "← Dashboard",
             mainTitle: "Statement Parser",
             mainSubtitle: "Upload a bank statement (PDF) to extract transactions.",
             uploadTitle: "Upload Statement",
@@ -195,6 +196,7 @@
         ja: {
             pageTitle: "明細パーサー - My Expenses - 詳細な洞察",
             loadingMessage: "PDFを処理中...",
+            backToDashboard: "← ダッシュボード",
             mainTitle: "明細パーサー",
             mainSubtitle: "取引明細書（PDF）をアップロードして取引を抽出します。",
             uploadTitle: "明細書をアップロード",
@@ -215,55 +217,19 @@
             errorUnsupportedPDF: "このPDF形式はサポートされていません。"
         }
     };
-    const LOCALES = { de: 'de-DE', en: 'en-US', ja: 'ja-JP' };
-    const SUPPORTED_LANGS = Object.keys(LOCALES);
+    const i18n = createTranslator(translations, {
+        onChange: (lang) => {
+            Preferences.saveLanguage(lang);
+            langSwitcher.value = lang;
+            if (allParsedItems.length > 0) filterAndDisplay();
+        }
+    });
 
-    const getTranslation = (key) => translations[currentLang]?.[key] ?? translations.de[key] ?? key;
-    const getLocale = () => LOCALES[currentLang] ?? LOCALES.de;
-    const formatAmount = (amount, currency) =>
-        new Intl.NumberFormat(getLocale(), { style: 'currency', currency }).format(amount);
+    const getTranslation = (key) => i18n.get(key);
+    const formatAmount = (amount, currency) => i18n.formatCurrency(amount, currency);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]);
-    const updateText = () => {
-        document.querySelectorAll('[data-i18n-key]').forEach(el => {
-            el.textContent = getTranslation(el.dataset.i18nKey);
-        });
-        document.documentElement.lang = currentLang;
-    };
-    const setLanguage = (lang) => {
-        currentLang = lang;
-        langSwitcher.value = lang;
-        localStorage.setItem('language', lang);
-        updateText();
-    };
-    const initializeLanguage = () => {
-        const savedLang = localStorage.getItem('language') || navigator.language.split('-')[0];
-        setLanguage(SUPPORTED_LANGS.includes(savedLang) ? savedLang : 'de');
-    };
-
-    // --- Theme Management ---
-    const applyTheme = (theme) => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-            themeIconLight.classList.remove('hidden');
-            themeIconDark.classList.add('hidden');
-        } else {
-            document.documentElement.classList.remove('dark');
-            themeIconLight.classList.add('hidden');
-            themeIconDark.classList.remove('hidden');
-        }
-    };
-    const toggleTheme = () => {
-        const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
-        localStorage.setItem('theme', newTheme);
-        applyTheme(newTheme);
-    };
-    const initializeTheme = () => {
-        const savedTheme = localStorage.getItem('theme');
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        applyTheme(savedTheme || (systemPrefersDark ? 'dark' : 'light'));
-    };
 
     // --- Utility Functions ---
     function parseGermanDate(str) {
@@ -801,13 +767,9 @@
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', () => {
-        initializeTheme();
-        initializeLanguage();
-        themeToggle.addEventListener('click', toggleTheme);
-        langSwitcher.addEventListener('change', (e) => {
-            setLanguage(e.target.value);
-            if (allParsedItems.length > 0) filterAndDisplay();
-        });
+        initTheme();
+        i18n.setLanguage(Preferences.language());
+        langSwitcher.addEventListener('change', (e) => i18n.setLanguage(e.target.value));
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         resetButton.addEventListener('click', resetApp);
         filterDateFrom.addEventListener('change', filterAndDisplay);

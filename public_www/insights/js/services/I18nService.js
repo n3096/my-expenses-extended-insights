@@ -1,8 +1,5 @@
 import { AppStore } from '../store/AppStore.js';
-
-export const DEFAULT_LANG = 'de';
-export const LOCALES = { de: 'de-DE', en: 'en-US', ja: 'ja-JP' };
-export const SUPPORTED_LANGS = Object.keys(LOCALES);
+import { DEFAULT_LANG, localeOf, resolveLanguage } from '../../../assets/js/i18n.js';
 
 export class I18nService {
     static translations = {
@@ -15,6 +12,7 @@ export class I18nService {
             apiChecking: "Prüfe Status...",
             apiOnline: "Kurs-API online",
             apiOffline: "Kurs-API offline",
+            backToDashboard: "← Dashboard",
             viewDashboard: "Dashboard",
             viewTimeline: "Zeitverlauf",
             viewComparison: "Vergleich",
@@ -89,6 +87,7 @@ export class I18nService {
             apiChecking: "Checking status...",
             apiOnline: "Rate API online",
             apiOffline: "Rate API offline",
+            backToDashboard: "← Dashboard",
             viewDashboard: "Dashboard",
             viewTimeline: "Timeline",
             viewComparison: "Comparison",
@@ -163,6 +162,7 @@ export class I18nService {
             apiChecking: "ステータスを確認中...",
             apiOnline: "レートAPI オンライン",
             apiOffline: "レートAPI オフライン",
+            backToDashboard: "← ダッシュボード",
             viewDashboard: "ダッシュボード",
             viewTimeline: "タイムライン",
             viewComparison: "比較",
@@ -263,12 +263,11 @@ export class I18nService {
     }
 
     static currentLang() {
-        const lang = AppStore.state.ui.currentLang;
-        return this.translations[lang] ? lang : DEFAULT_LANG;
+        return resolveLanguage(AppStore.state.ui.currentLang);
     }
 
     static locale() {
-        return LOCALES[this.currentLang()];
+        return localeOf(this.currentLang());
     }
 
     static formatCurrency(amount, currency) {

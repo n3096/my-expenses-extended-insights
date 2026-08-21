@@ -1,5 +1,6 @@
 import { CurrencyService, DEFAULT_CURRENCY } from '../services/CurrencyService.js';
 import { FilterService } from '../services/FilterService.js';
+import { Preferences } from '../../../assets/js/preferences.js';
 
 export const AppStore = {
     state: {
@@ -26,10 +27,10 @@ export const AppStore = {
             timelineMode: 'periodic'
         },
         ui: {
-            currentLang: 'de',
+            currentLang: Preferences.language(),
             currentView: 'dashboard',
             currencySelect: 'EUR_CONVERTED',
-            theme: 'dark'
+            theme: Preferences.theme()
         }
     },
 

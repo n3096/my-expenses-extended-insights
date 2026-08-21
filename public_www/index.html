@@ -64,15 +64,10 @@
     </footer>
 </div>
 
-<script>
-    // --- DOM Elements ---
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeIconLight = document.getElementById('theme-icon-light');
-    const themeIconDark = document.getElementById('theme-icon-dark');
-    const langSwitcher = document.getElementById('lang-switcher');
+<script type="module">
+    import { createTranslator } from './assets/js/i18n.js';
+    import { Preferences, initTheme } from './assets/js/preferences.js';
 
-    // --- App State & Config ---
-    let currentLang = 'de';
     const translations = {
         de: {
             pageTitle: "Dashboard - My Expenses - Extended Insights",
@@ -97,110 +92,53 @@
         }
     };
 
-    // --- i18n Functions ---
-    const getTranslation = (key) => {
-        return translations[currentLang]?.[key] || translations.de[key] || key;
-    };
+    const langSwitcher = document.getElementById('lang-switcher');
+    const grid = document.getElementById('tool-grid');
 
-    const updateText = () => {
-        document.querySelectorAll('[data-i18n-key]').forEach(el => {
-            el.textContent = getTranslation(el.dataset.i18nKey);
-        });
-        document.documentElement.lang = currentLang;
-    };
-
-    const setLanguage = (lang) => {
-        currentLang = lang;
-        langSwitcher.value = lang;
-        localStorage.setItem('language', lang);
-        updateText();
-    };
-
-    const initializeLanguage = () => {
-        const savedLang = localStorage.getItem('language');
-        const browserLang = navigator.language.split('-')[0];
-        const lang = savedLang || (['de', 'en', 'ja'].includes(browserLang) ? browserLang : 'de');
-        setLanguage(lang);
-    };
-
-    // --- Theme Management ---
-    const applyTheme = (theme) => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-            themeIconLight.classList.remove('hidden');
-            themeIconDark.classList.add('hidden');
-        } else {
-            document.documentElement.classList.remove('dark');
-            themeIconLight.classList.add('hidden');
-            themeIconDark.classList.remove('hidden');
+    const i18n = createTranslator(translations, {
+        onChange: (lang) => {
+            Preferences.saveLanguage(lang);
+            langSwitcher.value = lang;
         }
-    };
+    });
 
-    const toggleTheme = () => {
-        const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
-        localStorage.setItem('theme', newTheme);
-        applyTheme(newTheme);
-    };
-
-    const initializeTheme = () => {
-        const savedTheme = localStorage.getItem('theme');
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-        applyTheme(theme);
-    };
-
-    // --- Core Functions ---
-    async function fetchTools() {
-        try {
-            const response = await fetch('tools.json');
-            if (!response.ok) {
-                throw new Error(`HTTP Error! Status: ${response.status}`);
-            }
-            const tools = await response.json();
-            renderTools(tools);
-        } catch (error) {
-            console.error("Could not load or parse tools.json:", error);
-            const grid = document.getElementById('tool-grid');
-            grid.innerHTML = `<p class="text-red-500 col-span-full text-center">${getTranslation('loadingError')}</p>`;
-        }
-    }
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
 
     function renderTools(tools) {
-        const grid = document.getElementById('tool-grid');
-        grid.innerHTML = ''; // Clear existing content
-
         if (!tools || tools.length === 0) {
-            grid.innerHTML = `<p class="text-slate-500 col-span-full text-center">${getTranslation('noTools')}</p>`;
+            grid.innerHTML = `<p class="text-slate-500 col-span-full text-center">${escapeHtml(i18n.get('noTools'))}</p>`;
             return;
         }
 
-        tools.forEach(tool => {
-            const card = document.createElement('a');
-            card.href = tool.path;
-            card.className = 'tool-card bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 flex flex-col items-center justify-center gap-4 no-underline text-center';
-
-            card.innerHTML = `
-                <div class="text-6xl">${tool.emoji}</div>
-                <h2 class="text-xl font-bold text-slate-900 dark:text-white">${tool.name}</h2>
-            `;
-            grid.appendChild(card);
-        });
+        grid.innerHTML = tools.map(tool => `
+            <a href="${escapeHtml(tool.path)}" class="tool-card bg-white dark:bg-slate-800 rounded-2xl shadow-md p-6 flex flex-col items-center justify-center gap-4 no-underline text-center">
+                <div class="text-6xl">${escapeHtml(tool.emoji)}</div>
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white">${escapeHtml(tool.name)}</h2>
+            </a>
+        `).join('');
     }
 
-    // --- Initialization ---
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeTheme();
-        initializeLanguage();
+    async function loadTools() {
+        try {
+            const response = await fetch('tools.json');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            renderTools(await response.json());
+        } catch (error) {
+            console.error('Could not load tools.json:', error);
+            grid.innerHTML = `<p class="text-red-500 col-span-full text-center">${escapeHtml(i18n.get('loadingError'))}</p>`;
+        }
+    }
 
-        const currentYear = new Date().getFullYear();
-        const copyrightYear = Math.max(2025, currentYear);
-        document.getElementById('copyright').textContent = `© ${copyrightYear} My Expenses - Extended Insights`;
+    initTheme();
+    i18n.setLanguage(Preferences.language());
+    langSwitcher.addEventListener('change', (e) => i18n.setLanguage(e.target.value));
 
-        themeToggle.addEventListener('click', toggleTheme);
-        langSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
+    document.getElementById('copyright').textContent =
+        `© ${Math.max(2025, new Date().getFullYear())} My Expenses - Extended Insights`;
 
-        fetchTools();
-    });
+    loadTools();
 </script>
 </body>
 </html>
