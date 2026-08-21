@@ -126,5 +126,14 @@ export const AppStore = {
         this.state.fullyFilteredTransactions = FilterService.byCategory(this.state.timeFilteredTransactions, filters);
     },
 
-    notify() { this.listeners.forEach(cb => cb(this.state)); }
+    /** A failing subscriber must not stop the remaining ones from rendering. */
+    notify() {
+        this.listeners.forEach(cb => {
+            try {
+                cb(this.state);
+            } catch (error) {
+                console.error('Store subscriber failed:', error);
+            }
+        });
+    }
 };
