@@ -1,8 +1,13 @@
 export const AppStore = {
     state: {
         transactions: [],
+        /** All transactions, converted into the selected display currency. */
         processedTransactions: [],
+        /** processedTransactions restricted to the selected year/month. */
         timeFilteredTransactions: [],
+        /** processedTransactions restricted to the selected categories. */
+        categoryFilteredTransactions: [],
+        /** processedTransactions restricted to both year/month and categories. */
         fullyFilteredTransactions: [],
         exchangeRates: {},
         filters: {
@@ -86,7 +91,13 @@ export const AppStore = {
 
     processData() {
         const { transactions, ui, filters } = this.state;
-        if (!transactions.length) return;
+        if (!transactions.length) {
+            this.state.processedTransactions = [];
+            this.state.timeFilteredTransactions = [];
+            this.state.categoryFilteredTransactions = [];
+            this.state.fullyFilteredTransactions = [];
+            return;
+        }
         const targetCurrency = ui.currencySelect.split('_')[0].toUpperCase();
         this.state.processedTransactions = transactions.map(t => {
             const transCurrency = (t.currency || 'EUR').toUpperCase();
@@ -110,9 +121,9 @@ export const AppStore = {
             return yearMatch && monthMatch;
         });
 
-        this.state.fullyFilteredTransactions = this.state.timeFilteredTransactions.filter(t =>
-            filters.categories.has(t.displayCategory)
-        );
+        const matchesCategory = t => filters.categories.has(t.displayCategory);
+        this.state.categoryFilteredTransactions = this.state.processedTransactions.filter(matchesCategory);
+        this.state.fullyFilteredTransactions = this.state.timeFilteredTransactions.filter(matchesCategory);
     },
 
     notify() { this.listeners.forEach(cb => cb(this.state)); }

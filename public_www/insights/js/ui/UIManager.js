@@ -1,6 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
 import { CompareManager } from '../services/CompareManager.js';
+import { escapeHtml } from '../utils/dom.js';
 
 export class UIManager {
     static init() {
@@ -27,24 +28,30 @@ export class UIManager {
         const container = document.getElementById('category-list-container');
         if (!container) return;
 
-        const uniqueCats = [...new Set(state.transactions.map(t => t.displayCategory || 'Unkategorisiert'))].sort();
-        const activeCats = state.filters.categories;
+        const categories = this.getCategories(state);
+        const renderedCategories = container.dataset.categories;
 
-        container.innerHTML = uniqueCats.map(cat => `
-            <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
-                <input type="checkbox" id="cat-${cat}" value="${cat}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" ${activeCats.has(cat) ? 'checked' : ''}>
-                <label for="cat-${cat}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${cat}</label>
-            </div>
-        `).join('');
+        // Rebuilding the list on every store update would drop the scroll
+        // position, so only the checkbox states are synced unless the set of
+        // categories itself changed.
+        if (renderedCategories !== categories.join('\u0000')) {
+            container.dataset.categories = categories.join('\u0000');
+            container.innerHTML = categories.map((cat, index) => `
+                <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
+                    <input type="checkbox" id="cat-filter-${index}" value="${escapeHtml(cat)}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600">
+                    <label for="cat-filter-${index}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${escapeHtml(cat)}</label>
+                </div>
+            `).join('');
+        }
 
         container.querySelectorAll('.cat-filter-cb').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                const newCats = new Set(AppStore.state.filters.categories);
-                if (e.target.checked) newCats.add(e.target.value);
-                else newCats.delete(e.target.value);
-                AppStore.update({ filters: { categories: newCats } });
-            });
+            cb.checked = state.filters.categories.has(cb.value);
         });
+    }
+
+    /** All categories present in the uploaded file, independent of the active filters. */
+    static getCategories(state) {
+        return [...new Set(state.processedTransactions.map(t => t.displayCategory))].sort();
     }
 
     static syncComparisonYears(state) {
@@ -157,6 +164,14 @@ export class UIManager {
         const categoryModal = document.getElementById('category-modal');
         const closeBtn = document.getElementById('close-category-modal-btn');
 
+        document.getElementById('category-list-container')?.addEventListener('change', (e) => {
+            if (!e.target.classList.contains('cat-filter-cb')) return;
+            const categories = new Set(AppStore.state.filters.categories);
+            if (e.target.checked) categories.add(e.target.value);
+            else categories.delete(e.target.value);
+            AppStore.update({ filters: { categories } });
+        });
+
         if (filterBtn && categoryModal) {
             filterBtn.addEventListener('click', () => categoryModal.classList.remove('hidden'));
 
@@ -168,8 +183,7 @@ export class UIManager {
         }
 
         document.getElementById('select-all-btn')?.addEventListener('click', () => {
-            const allCats = new Set(AppStore.state.transactions.map(t => t.displayCategory || 'Unkategorisiert'));
-            AppStore.update({ filters: { categories: allCats } });
+            AppStore.update({ filters: { categories: new Set(this.getCategories(AppStore.state)) } });
         });
 
         document.getElementById('deselect-all-btn')?.addEventListener('click', () => {

@@ -17,7 +17,7 @@ export class ChartManager {
         const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency });
 
         if (state.ui.currentView === 'dashboard') {
-            const data = state.timeFilteredTransactions;
+            const data = state.fullyFilteredTransactions;
             const income = data.filter(t => t.type === 'income').reduce((s,t) => s + t.displayAmount, 0);
             const expenses = data.filter(t => t.type === 'expense').reduce((s,t) => s + t.displayAmount, 0);
 
@@ -25,7 +25,7 @@ export class ChartManager {
             this.setTxt('total-expenses', formatter.format(-expenses));
             this.setTxt('net-savings', formatter.format(income - expenses));
 
-            this.renderExpenseChart(state.timeFilteredTransactions);
+            this.renderExpenseChart(data);
         }
 
         if (state.ui.currentView === 'timeline') {

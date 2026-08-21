@@ -21,14 +21,7 @@ export class TableManager {
 
         const tbody = document.querySelector('#transactions-table-body');
         if (tbody) {
-            let filtered = state.processedTransactions;
-
-            if (state.filters.year !== 'all') {
-                filtered = filtered.filter(t => new Date(t.date).getFullYear().toString() === state.filters.year);
-            }
-            if (state.filters.month !== 'all') {
-                filtered = filtered.filter(t => (new Date(t.date).getMonth() + 1).toString().padStart(2, '0') === state.filters.month);
-            }
+            let filtered = state.fullyFilteredTransactions;
 
             if (searchTerm) {
                 filtered = filtered.filter(t =>
@@ -54,7 +47,7 @@ export class TableManager {
     }
 
     static renderDashboardTable(state, formatter) {
-        const data = state.timeFilteredTransactions;
+        const data = state.fullyFilteredTransactions;
         const tbody = document.querySelector('#dashboard-view table tbody');
         if (!tbody) return;
 
@@ -81,7 +74,7 @@ export class TableManager {
         const container = document.getElementById('category-details-container');
         if (!container) return;
 
-        const data = state.timeFilteredTransactions;
+        const data = state.fullyFilteredTransactions;
         const cats = {};
 
         data.forEach(t => {

@@ -38,7 +38,7 @@ export class CompareManager {
 
     static getAggregatedData(state, years, type) {
         const result = {};
-        state.processedTransactions.forEach(t => {
+        state.categoryFilteredTransactions.forEach(t => {
             const year = new Date(t.date).getFullYear().toString();
             if (!years.includes(year)) return;
 
