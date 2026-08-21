@@ -1,6 +1,6 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
-import { escapeHtml } from '../utils/dom.js';
+import { escapeHtml } from '../../../assets/js/dom.js';
 import { colorAt } from './palette.js';
 import { Preferences, applyTheme } from '../../../assets/js/preferences.js';
 

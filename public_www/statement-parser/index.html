@@ -127,6 +127,7 @@
     import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.min.mjs';
     import { createTranslator } from '../assets/js/i18n.js';
     import { Preferences, initTheme } from '../assets/js/preferences.js';
+    import { escapeHtml } from '../assets/js/dom.js';
 
     const PDFJS_VERSION = '4.3.136';
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`;
@@ -227,9 +228,6 @@
 
     const getTranslation = (key) => i18n.get(key);
     const formatAmount = (amount, currency) => i18n.formatCurrency(amount, currency);
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[char]);
 
     // --- Utility Functions ---
     function parseGermanDate(str) {

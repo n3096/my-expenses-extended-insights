@@ -67,6 +67,7 @@
 <script type="module">
     import { createTranslator } from './assets/js/i18n.js';
     import { Preferences, initTheme } from './assets/js/preferences.js';
+    import { escapeHtml } from './assets/js/dom.js';
 
     const translations = {
         de: {
@@ -101,10 +102,6 @@
             langSwitcher.value = lang;
         }
     });
-
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[char]);
 
     function renderTools(tools) {
         if (!tools || tools.length === 0) {

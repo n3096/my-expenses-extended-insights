@@ -1,7 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from './I18nService.js';
 import { CurrencyService } from './CurrencyService.js';
-import { escapeHtml } from '../utils/dom.js';
+import { escapeHtml } from '../../../assets/js/dom.js';
 import { CHART_COLORS, colorAt } from '../ui/palette.js';
 
 const TOP_CATEGORY_COUNT = 10;

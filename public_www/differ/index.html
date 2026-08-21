@@ -131,6 +131,7 @@
 <script type="module">
     import { createTranslator } from '../assets/js/i18n.js';
     import { Preferences, initTheme } from '../assets/js/preferences.js';
+    import { escapeHtml } from '../assets/js/dom.js';
 
     const TRANSLATIONS = {
         de: {
@@ -189,9 +190,6 @@
 
     const t = (key) => i18n.get(key);
 
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[char]);
 
     const yen = (amount) => `${amount.toLocaleString()} ¥`;
 
