@@ -1,7 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
-import { CompareManager } from '../services/CompareManager.js';
 import { escapeHtml } from '../utils/dom.js';
+import { colorAt } from './palette.js';
 
 export class UIManager {
     static init() {
@@ -82,14 +82,13 @@ export class UIManager {
         if (!container) return;
 
         const years = this.getYears(state);
-        const colors = CompareManager.getColors();
 
         if (container.dataset.years !== years.join(',')) {
             container.dataset.years = years.join(',');
             container.innerHTML = years.map((yr, idx) => `
                 <label class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
                     <input type="checkbox" class="year-checkbox w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" value="${yr}">
-                    <span class="w-3 h-3 rounded-full" style="background-color: ${colors[idx % colors.length]}"></span>
+                    <span class="w-3 h-3 rounded-full" style="background-color: ${colorAt(idx)}"></span>
                     ${yr}
                 </label>
             `).join('');

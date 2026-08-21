@@ -1,6 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
 import { CurrencyService } from '../services/CurrencyService.js';
+import { ACCENT_COLOR, CHART_COLORS, colorAt } from './palette.js';
 
 const WEEKS_IN_SHORT_TIMEFRAME = 5;
 
@@ -44,10 +45,9 @@ export class ChartManager {
 
         const allSortedCats = [...new Set(state.processedTransactions.map(t => t.displayCategory))].sort();
         const activeCategories = allSortedCats.filter(cat => state.filters.categories.has(cat));
-        const colors = this.getColors();
 
         const datasets = activeCategories.map(cat => {
-            const color = colors[allSortedCats.indexOf(cat) % colors.length];
+            const color = colorAt(allSortedCats.indexOf(cat));
             let running = 0;
 
             const values = periods.map(period => {
@@ -103,8 +103,8 @@ export class ChartManager {
                 datasets: [{
                     label: I18nService.get(mode === 'cumulative' ? 'cumulative' : 'netResult'),
                     data: values,
-                    borderColor: '#4F46E5',
-                    backgroundColor: '#4F46E522',
+                    borderColor: ACCENT_COLOR,
+                    backgroundColor: `${ACCENT_COLOR}22`,
                     fill: true,
                     tension: 0.1,
                     pointRadius: 2
@@ -266,14 +266,25 @@ export class ChartManager {
         if (!canvas) return;
         const cats = {};
         data.filter(t => t.type === 'expense').forEach(t => cats[t.displayCategory] = (cats[t.displayCategory] || 0) + t.displayAmount);
+
         this.draw('expense-chart', {
             type: 'doughnut',
-            data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: this.getColors(), borderWidth: 1 }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: {
+                labels: Object.keys(cats),
+                datasets: [{ data: Object.values(cats), backgroundColor: CHART_COLORS, borderWidth: 1 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, CurrencyService.parseSelection(AppStore.state.ui.currencySelect).currency)}`
+                        }
+                    }
+                }
+            }
         });
     }
 
-    static getColors() {
-        return ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#22D3EE', '#F472B6', '#A78BFA', '#FB7185', '#34D399', '#FBBF24', '#60A5FA', '#F87171', '#3B82F6', '#2DD4BF', '#F43F5E', '#8263FF', '#00C49F', '#FFBB28', '#FF8042', '#0088FE'];
-    }
 }

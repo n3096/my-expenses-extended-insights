@@ -1,7 +1,11 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from './I18nService.js';
-import { escapeHtml } from '../utils/dom.js';
 import { CurrencyService } from './CurrencyService.js';
+import { escapeHtml } from '../utils/dom.js';
+import { CHART_COLORS, colorAt } from '../ui/palette.js';
+
+const TOP_CATEGORY_COUNT = 10;
+const MIN_YEARS_FOR_DEVIATION = 2;
 
 export class CompareManager {
     static charts = new Map();
@@ -16,26 +20,38 @@ export class CompareManager {
 
     static render(state) {
         const years = state.filters.comparisonYears;
-        const type = state.filters.comparisonType;
+        const isBar = state.filters.comparisonChartType === 'bar';
         const hasData = years.length >= 1;
+        const canCompare = years.length >= MIN_YEARS_FOR_DEVIATION;
 
+        this.syncChartTypeButtons(isBar);
         this.toggleElement('no-comparison-data', !hasData);
-        this.toggleElement('comparison-chart-container', hasData && state.filters.comparisonChartType === 'bar');
-        this.toggleElement('comparison-pie-charts-container', hasData && state.filters.comparisonChartType === 'pie');
-        this.toggleElement('comparison-deviation-chart-container', hasData);
+        this.toggleElement('comparison-chart-container', hasData && isBar);
+        this.toggleElement('comparison-pie-charts-container', hasData && !isBar);
+        this.toggleElement('comparison-deviation-chart-container', canCompare);
+        this.toggleElement('no-comparison-deviation-data', hasData && !canCompare);
 
-        if (!hasData) return;
+        if (!hasData) {
+            this.destroyAll();
+            return;
+        }
 
-        const aggregated = this.getAggregatedData(state, years, type);
-        const categories = [...new Set(Object.keys(aggregated))].sort();
+        const aggregated = this.getAggregatedData(state, years, state.filters.comparisonType);
+        const categories = Object.keys(aggregated).sort();
 
-        if (state.filters.comparisonChartType === 'bar') {
-            this.renderBarChart(years, categories, aggregated, state, 'comparison-bar', 'comparison-chart');
+        if (isBar) {
+            this.destroyPieCharts();
+            this.renderBarChart('comparison-chart', years, categories, aggregated, state);
         } else {
+            this.destroyChart('comparison-chart');
             this.renderPieCharts(years, aggregated, state);
         }
 
-        this.renderTopCategoriesChart(years, aggregated, state);
+        if (canCompare) {
+            this.renderTopCategoriesChart(years, aggregated, state);
+        } else {
+            this.destroyChart('comparison-deviation-chart');
+        }
     }
 
     static getAggregatedData(state, years, type) {
@@ -44,93 +60,89 @@ export class CompareManager {
             const year = new Date(t.date).getFullYear().toString();
             if (!years.includes(year)) return;
 
-            const cat = t.displayCategory;
-            if (!result[cat]) result[cat] = {};
-            if (!result[cat][year]) result[cat][year] = 0;
+            const value = this.valueOf(t, type);
+            if (value === 0) return;
 
-            let value = 0;
-            if (type === 'income' && t.type === 'income') value = t.displayAmount;
-            if (type === 'expenses' && t.type === 'expense') value = t.displayAmount;
-            if (type === 'net') value = t.type === 'income' ? t.displayAmount : -t.displayAmount;
-
-            result[cat][year] += value;
+            const byYear = result[t.displayCategory] ??= {};
+            byYear[year] = (byYear[year] ?? 0) + value;
         });
         return result;
     }
 
-    static renderBarChart(years, categories, data, state, chartId, canvasId) {
-        const ctx = document.getElementById(canvasId)?.getContext('2d');
-        if (!ctx) return;
+    static valueOf(transaction, type) {
+        if (type === 'income') return transaction.type === 'income' ? transaction.displayAmount : 0;
+        if (type === 'expenses') return transaction.type === 'expense' ? transaction.displayAmount : 0;
+        return transaction.type === 'income' ? transaction.displayAmount : -transaction.displayAmount;
+    }
 
-        const colors = this.getColors();
-        const datasets = years.map((year, i) => ({
-            label: year,
-            data: categories.map(cat => data[cat][year] || 0),
-            backgroundColor: colors[i % colors.length]
-        }));
-
-        this.drawChart(chartId, ctx, {
+    static renderBarChart(canvasId, years, categories, data, state) {
+        this.drawChart(canvasId, {
             type: 'bar',
-            data: { labels: categories, datasets },
+            data: {
+                labels: categories,
+                datasets: years.map((year, i) => ({
+                    label: year,
+                    data: categories.map(cat => data[cat]?.[year] ?? 0),
+                    backgroundColor: colorAt(i)
+                }))
+            },
             options: this.getOptions(state)
         });
     }
 
     static renderTopCategoriesChart(years, data, state) {
-        const ctx = document.getElementById('comparison-deviation-chart')?.getContext('2d');
-        if (!ctx) return;
-
         const topCategories = Object.keys(data)
             .map(cat => ({
                 name: cat,
-                total: Object.values(data[cat]).reduce((sum, val) => sum + Math.abs(val), 0)
+                deviation: this.deviationOf(data[cat], years)
             }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 10)
+            .sort((a, b) => b.deviation - a.deviation)
+            .slice(0, TOP_CATEGORY_COUNT)
             .map(item => item.name);
 
-        const colors = this.getColors();
-        const datasets = years.map((year, i) => ({
-            label: year,
-            data: topCategories.map(cat => data[cat][year] || 0),
-            backgroundColor: colors[i % colors.length]
-        }));
+        this.renderBarChart('comparison-deviation-chart', years, topCategories, data, state);
+    }
 
-        this.drawChart('comparison-top10', ctx, {
-            type: 'bar',
-            data: { labels: topCategories, datasets },
-            options: this.getOptions(state)
-        });
+    /** Spread between the selected years - the categories that changed the most. */
+    static deviationOf(byYear, years) {
+        const values = years.map(year => byYear[year] ?? 0);
+        return Math.max(...values) - Math.min(...values);
     }
 
     static renderPieCharts(years, data, state) {
         const container = document.getElementById('comparison-pie-charts-container');
         if (!container) return;
-        container.innerHTML = '';
 
-        years.forEach((year) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl';
-            wrapper.innerHTML = `<h3 class="text-center font-bold mb-2 text-slate-800 dark:text-slate-200">${escapeHtml(year)}</h3><canvas id="pie-${escapeHtml(year)}"></canvas>`;
-            container.appendChild(wrapper);
+        this.destroyPieCharts();
+        container.innerHTML = years.map(year => `
+            <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl">
+                <h3 class="text-center font-bold mb-2 text-slate-800 dark:text-slate-200">${escapeHtml(year)}</h3>
+                <div class="relative h-64"><canvas id="pie-${escapeHtml(year)}"></canvas></div>
+            </div>
+        `).join('');
 
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
+
+        years.forEach(year => {
             const yearData = {};
             Object.keys(data).forEach(cat => {
                 if (data[cat][year]) yearData[cat] = Math.abs(data[cat][year]);
             });
 
-            new Chart(document.getElementById(`pie-${year}`), {
+            this.drawChart(`pie-${year}`, {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(yearData),
-                    datasets: [{ data: Object.values(yearData), backgroundColor: this.getColors() }]
+                    datasets: [{ data: Object.values(yearData), backgroundColor: CHART_COLORS }]
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, CurrencyService.parseSelection(state.ui.currencySelect).currency)}`
+                                label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, currency)}`
                             }
                         }
                     }
@@ -139,9 +151,32 @@ export class CompareManager {
         });
     }
 
-    static drawChart(id, ctx, config) {
-        if (this.charts.has(id)) this.charts.get(id).destroy();
-        this.charts.set(id, new Chart(ctx, config));
+    static syncChartTypeButtons(isBar) {
+        document.getElementById('comparison-bar-btn')?.classList.toggle('view-btn', true);
+        document.getElementById('comparison-pie-btn')?.classList.toggle('view-btn', true);
+        document.getElementById('comparison-bar-btn')?.classList.toggle('active', isBar);
+        document.getElementById('comparison-pie-btn')?.classList.toggle('active', !isBar);
+    }
+
+    static drawChart(canvasId, config) {
+        this.destroyChart(canvasId);
+        const canvas = document.getElementById(canvasId);
+        if (canvas) this.charts.set(canvasId, new Chart(canvas, config));
+    }
+
+    static destroyChart(canvasId) {
+        this.charts.get(canvasId)?.destroy();
+        this.charts.delete(canvasId);
+    }
+
+    static destroyPieCharts() {
+        [...this.charts.keys()]
+            .filter(id => id.startsWith('pie-'))
+            .forEach(id => this.destroyChart(id));
+    }
+
+    static destroyAll() {
+        [...this.charts.keys()].forEach(id => this.destroyChart(id));
     }
 
     static getOptions(state) {
@@ -166,16 +201,17 @@ export class CompareManager {
                 }
             },
             plugins: {
-                legend: { labels: { color: textColor } }
+                legend: { labels: { color: textColor } },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${I18nService.formatCurrency(ctx.parsed.y, currency)}`
+                    }
+                }
             }
         };
     }
 
     static toggleElement(id, show) {
         document.getElementById(id)?.classList.toggle('hidden', !show);
-    }
-
-    static getColors() {
-        return ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#F43F5E', '#00C49F', '#FFBB28'];
     }
 }
