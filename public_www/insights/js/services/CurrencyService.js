@@ -1,5 +1,4 @@
 export const DEFAULT_CURRENCY = 'EUR';
-const UNCATEGORIZED = 'Unkategorisiert';
 
 /**
  * Converts transactions into the currency the user selected.
@@ -48,9 +47,7 @@ export class CurrencyService {
 
                 return {
                     ...t,
-                    displayAmount: sourceRate && targetRate ? (t.amount / sourceRate) * targetRate : t.amount,
-                    displayCurrency: nativeOnly ? source : target,
-                    displayCategory: t.category || UNCATEGORIZED
+                    displayAmount: sourceRate && targetRate ? (t.amount / sourceRate) * targetRate : t.amount
                 };
             });
 

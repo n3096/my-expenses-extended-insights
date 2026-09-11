@@ -62,7 +62,7 @@ export class CompareManager {
             const value = this.valueOf(t, type);
             if (value === 0) return;
 
-            const byYear = result[t.displayCategory] ??= {};
+            const byYear = result[t.category] ??= {};
             byYear[year] = (byYear[year] ?? 0) + value;
         });
         return result;

@@ -8,7 +8,7 @@ export class FilterService {
     }
 
     static matchesCategory(transaction, { categories }) {
-        return categories.has(transaction.displayCategory);
+        return categories.has(transaction.category);
     }
 
     static byPeriod(transactions, filters) {

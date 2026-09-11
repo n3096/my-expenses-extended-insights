@@ -23,9 +23,9 @@ export class ChartManager {
             const income = data.filter(t => t.type === 'income').reduce((s,t) => s + t.displayAmount, 0);
             const expenses = data.filter(t => t.type === 'expense').reduce((s,t) => s + t.displayAmount, 0);
 
-            this.setTxt('total-income', formatter.format(income));
-            this.setTxt('total-expenses', formatter.format(-expenses));
-            this.setTxt('net-savings', formatter.format(income - expenses));
+            this.setText('total-income', formatter.format(income));
+            this.setText('total-expenses', formatter.format(-expenses));
+            this.setText('net-savings', formatter.format(income - expenses));
 
             this.renderExpenseChart(data);
         }
@@ -141,7 +141,7 @@ export class ChartManager {
         this.forEachInPeriod(transactions, periods, timeframe, (period, transaction) => {
             const byCategory = totals.get(period.key);
             const signed = transaction.type === 'income' ? transaction.displayAmount : -transaction.displayAmount;
-            byCategory.set(transaction.displayCategory, (byCategory.get(transaction.displayCategory) ?? 0) + signed);
+            byCategory.set(transaction.category, (byCategory.get(transaction.category) ?? 0) + signed);
         });
         return totals;
     }
@@ -218,7 +218,10 @@ export class ChartManager {
         this.instances.delete(id);
     }
 
-    static setTxt(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+    static setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
 
     /**
      * Builds the buckets a timeline is drawn on. The range ends at the most recent
@@ -290,7 +293,7 @@ export class ChartManager {
         const canvas = document.getElementById('expense-chart');
         if (!canvas) return;
         const cats = {};
-        data.filter(t => t.type === 'expense').forEach(t => cats[t.displayCategory] = (cats[t.displayCategory] || 0) + t.displayAmount);
+        data.filter(t => t.type === 'expense').forEach(t => cats[t.category] = (cats[t.category] || 0) + t.displayAmount);
 
         const isEmpty = Object.keys(cats).length === 0;
         canvas.classList.toggle('hidden', isEmpty);

@@ -29,7 +29,7 @@ export class TableManager {
             if (searchTerm) {
                 filtered = filtered.filter(t =>
                     (t.description || '').toLowerCase().includes(searchTerm) ||
-                    t.displayCategory.toLowerCase().includes(searchTerm)
+                    t.category.toLowerCase().includes(searchTerm)
                 );
             }
 
@@ -41,7 +41,7 @@ export class TableManager {
             tbody.innerHTML = filtered.map(t => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm">
                     <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${I18nService.formatDate(t.date)}</td>
-                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(t.displayCategory)}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(t.category)}</td>
                     <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${escapeHtml(t.description || '-')}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}">
                         ${t.type === 'income' ? '+' : '-'}${formatter.format(t.displayAmount)}
@@ -61,9 +61,9 @@ export class TableManager {
 
         const cats = {};
         data.forEach(t => {
-            if (!cats[t.displayCategory]) cats[t.displayCategory] = { inc: 0, exp: 0 };
-            if (t.type === 'income') cats[t.displayCategory].inc += t.displayAmount;
-            else cats[t.displayCategory].exp += t.displayAmount;
+            if (!cats[t.category]) cats[t.category] = { inc: 0, exp: 0 };
+            if (t.type === 'income') cats[t.category].inc += t.displayAmount;
+            else cats[t.category].exp += t.displayAmount;
         });
 
         tbody.innerHTML = Object.entries(cats)
@@ -86,9 +86,9 @@ export class TableManager {
         const cats = {};
 
         data.forEach(t => {
-            if (!cats[t.displayCategory]) cats[t.displayCategory] = { inc: 0, exp: 0 };
-            if (t.type === 'income') cats[t.displayCategory].inc += t.displayAmount;
-            else cats[t.displayCategory].exp += t.displayAmount;
+            if (!cats[t.category]) cats[t.category] = { inc: 0, exp: 0 };
+            if (t.type === 'income') cats[t.category].inc += t.displayAmount;
+            else cats[t.category].exp += t.displayAmount;
         });
 
         if (Object.keys(cats).length === 0) {
