@@ -45,7 +45,7 @@ export class UIManager {
         const container = document.getElementById('category-list-container');
         if (!container) return;
 
-        const categories = this.getCategories(state);
+        const categories = state.categories;
         const renderedCategories = container.dataset.categories;
 
         // Rebuilding the list on every store update would drop the scroll
@@ -74,11 +74,6 @@ export class UIManager {
         if (state.missingRates > 0) {
             banner.textContent = I18nService.format('missingRatesWarning', { count: state.missingRates });
         }
-    }
-
-    /** All categories present in the uploaded file, independent of the active filters. */
-    static getCategories(state) {
-        return [...new Set(state.processedTransactions.map(t => t.displayCategory))].sort();
     }
 
     static syncComparisonYears(state) {
@@ -213,7 +208,7 @@ export class UIManager {
         }
 
         document.getElementById('select-all-btn')?.addEventListener('click', () => {
-            AppStore.update({ filters: { categories: new Set(this.getCategories(AppStore.state)) } });
+            AppStore.update({ filters: { categories: new Set(AppStore.state.categories) } });
         });
 
         document.getElementById('deselect-all-btn')?.addEventListener('click', () => {

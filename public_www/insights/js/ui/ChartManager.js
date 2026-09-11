@@ -43,11 +43,10 @@ export class ChartManager {
         const periods = this.getPeriods(state.processedTransactions, timeframe);
         const netByPeriod = this.sumByPeriodAndCategory(state.processedTransactions, periods, timeframe);
 
-        const allSortedCats = [...new Set(state.processedTransactions.map(t => t.displayCategory))].sort();
-        const activeCategories = allSortedCats.filter(cat => state.filters.categories.has(cat));
+        const activeCategories = state.categories.filter(cat => state.filters.categories.has(cat));
 
         const datasets = activeCategories.map(cat => {
-            const color = colorAt(allSortedCats.indexOf(cat));
+            const color = colorAt(state.categories.indexOf(cat));
             let running = 0;
 
             const values = periods.map(period => {
@@ -80,21 +79,20 @@ export class ChartManager {
 
         const { timelineTimeframe: timeframe, timelineMode: mode } = state.filters;
         const periods = this.getPeriods(state.processedTransactions, timeframe);
+        const netByPeriod = this.sumByPeriod(state.processedTransactions, periods, timeframe);
 
-        // The cumulative line has to start at the very first transaction, otherwise
-        // the selected timeframe would silently reset the running total to zero.
-        const allPeriods = this.getPeriods(state.processedTransactions, 'max');
-        const netByPeriod = this.sumByPeriod(state.processedTransactions, allPeriods, 'max');
+        // The cumulative line carries everything booked before the visible window,
+        // otherwise picking a shorter timeframe would reset the running total.
+        let running = mode === 'cumulative'
+            ? this.netBefore(state.processedTransactions, periods[0])
+            : 0;
 
-        let running = 0;
-        const totals = new Map();
-        allPeriods.forEach(period => {
+        const values = periods.map(period => {
             const periodic = netByPeriod.get(period.key) ?? 0;
+            if (mode !== 'cumulative') return periodic;
             running += periodic;
-            totals.set(period.key, { periodic, cumulative: running });
+            return running;
         });
-
-        const values = periods.map(period => totals.get(period.key)?.[mode] ?? 0);
 
         this.draw('net-timeline-chart', {
             type: 'line',
@@ -112,6 +110,19 @@ export class ChartManager {
             },
             options: this.getOptions(state, { allowNegative: true })
         });
+    }
+
+    /** Net amount of everything booked before the first visible period. */
+    static netBefore(transactions, period) {
+        if (!period) return 0;
+        const start = this.periodStart(period).getTime();
+        return transactions
+            .filter(t => new Date(t.date).getTime() < start)
+            .reduce((total, t) => total + (t.type === 'income' ? t.displayAmount : -t.displayAmount), 0);
+    }
+
+    static periodStart(period) {
+        return period.start ?? new Date(period.year, period.month, 1);
     }
 
     /** Net amount (income - expense) per period, keyed by period. */
@@ -221,8 +232,8 @@ export class ChartManager {
 
         let start;
         if (timeframe === 'max') {
-            const timestamps = data.map(t => new Date(t.date).getTime());
-            start = timestamps.length ? new Date(Math.min(...timestamps)) : new Date(end);
+            const earliest = this.extremeTimestamp(data, Math.min);
+            start = earliest === null ? new Date(end) : new Date(earliest);
             start.setDate(1);
         } else {
             const count = parseInt(timeframe, 10);
@@ -261,9 +272,18 @@ export class ChartManager {
     static rangeEnd(data) {
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        const timestamps = data.map(t => new Date(t.date).getTime()).filter(Number.isFinite);
-        if (!timestamps.length) return now;
-        return new Date(Math.min(Math.max(...timestamps), now.getTime()));
+        const latest = this.extremeTimestamp(data, Math.max);
+        if (latest === null) return now;
+        return new Date(Math.min(latest, now.getTime()));
+    }
+
+    /** Reduce rather than spread - a large export would overflow the argument list. */
+    static extremeTimestamp(data, pick) {
+        return data.reduce((best, t) => {
+            const time = new Date(t.date).getTime();
+            if (!Number.isFinite(time)) return best;
+            return best === null ? time : pick(best, time);
+        }, null);
     }
 
     static renderExpenseChart(data) {

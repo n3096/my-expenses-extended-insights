@@ -14,6 +14,8 @@ export const AppStore = {
         /** processedTransactions restricted to both year/month and categories. */
         fullyFilteredTransactions: [],
         exchangeRates: {},
+        /** Every category in the uploaded file, sorted - independent of any filter. */
+        categories: [],
         /** Number of transactions that could not be converted for lack of a rate. */
         missingRates: 0,
         filters: {
@@ -107,6 +109,7 @@ export const AppStore = {
     processData() {
         const { transactions, ui, filters } = this.state;
         if (!transactions.length) {
+            this.state.categories = [];
             this.state.missingRates = 0;
             this.state.processedTransactions = [];
             this.state.timeFilteredTransactions = [];
@@ -114,6 +117,8 @@ export const AppStore = {
             this.state.fullyFilteredTransactions = [];
             return;
         }
+        this.state.categories = [...new Set(transactions.map(t => t.category))].sort();
+
         const { transactions: processed, missingRates } = CurrencyService.process(
             transactions,
             ui.currencySelect,

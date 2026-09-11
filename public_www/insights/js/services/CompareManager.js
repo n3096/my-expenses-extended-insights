@@ -117,7 +117,7 @@ export class CompareManager {
         container.innerHTML = years.map(year => `
             <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl">
                 <h3 class="text-center font-bold mb-2 text-slate-800 dark:text-slate-200">${escapeHtml(year)}</h3>
-                <div class="relative h-64"><canvas id="pie-${escapeHtml(year)}"></canvas></div>
+                <div class="relative h-64"><canvas id="${escapeHtml(`pie-${year}`)}"></canvas></div>
             </div>
         `).join('');
 
