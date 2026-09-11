@@ -129,7 +129,7 @@
 </div>
 
 <script type="module">
-    import { createTranslator } from '../assets/js/i18n.js';
+    import { createTranslator, localeOf } from '../assets/js/i18n.js';
     import { Preferences, initTheme } from '../assets/js/preferences.js';
     import { escapeHtml } from '../assets/js/dom.js';
 
@@ -178,20 +178,20 @@
     const POINT_METHOD = 'PayPay Point';
     const BALANCE_TOLERANCE_YEN = 10;
 
-    const state = { diffResults: [] };
+    const state = { diffResults: [], balances: null, savings: null };
 
     const i18n = createTranslator(TRANSLATIONS, {
         onChange: (lang) => {
             Preferences.saveLanguage(lang);
             document.getElementById('lang-select').value = lang;
-            if (state.diffResults.length > 0) renderResults();
+            renderDiff();
         }
     });
 
     const t = (key) => i18n.get(key);
 
 
-    const yen = (amount) => `${amount.toLocaleString()} ¥`;
+    const yen = (amount) => `${amount.toLocaleString(localeOf(i18n.lang))} ¥`;
 
     function showRunError(messageKey) {
         const el = document.getElementById('run-error');
@@ -297,12 +297,21 @@
             monthlySavings[s.monthKey] = (monthlySavings[s.monthKey] || 0) + s.pointsSaved;
         });
 
-        const appDelta = sumDelta(appItems);
-        const realCashDelta = sumDelta(stmtItems);
-        renderBalances(appDelta, realCashDelta, totalPointsSaved);
-        renderSavings(monthlySavings);
-
+        state.balances = {
+            app: sumDelta(appItems),
+            realCash: sumDelta(stmtItems),
+            points: totalPointsSaved
+        };
+        state.savings = monthlySavings;
         state.diffResults = matchTransactions(appItems, stmtItems).sort(byDateDescending);
+
+        renderDiff();
+    }
+
+    function renderDiff() {
+        if (!state.balances) return;
+        renderBalances(state.balances);
+        renderSavings(state.savings);
         renderResults();
     }
 
@@ -356,17 +365,17 @@
         return String(stmtPayee ?? '').toLowerCase().includes(needle);
     }
 
-    function renderBalances(appDelta, realCashDelta, totalPointsSaved) {
-        const effectiveRealBalance = realCashDelta + totalPointsSaved;
+    function renderBalances({ app, realCash, points }) {
+        const effectiveRealBalance = realCash + points;
 
-        document.getElementById('app-total-balance').textContent = yen(appDelta);
-        document.getElementById('real-total-balance').textContent = yen(realCashDelta);
-        document.getElementById('total-points-sum').textContent = `+${yen(totalPointsSaved)}`;
+        document.getElementById('app-total-balance').textContent = yen(app);
+        document.getElementById('real-total-balance').textContent = yen(realCash);
+        document.getElementById('total-points-sum').textContent = `+${yen(points)}`;
 
         const deltaEl = document.getElementById('balance-delta');
         deltaEl.textContent = yen(effectiveRealBalance);
 
-        const isBalanced = Math.abs(effectiveRealBalance - appDelta) < BALANCE_TOLERANCE_YEN;
+        const isBalanced = Math.abs(effectiveRealBalance - app) < BALANCE_TOLERANCE_YEN;
         deltaEl.className = isBalanced
             ? 'text-lg font-black text-green-500'
             : 'text-lg font-black text-indigo-600 dark:text-indigo-400';
