@@ -1,0 +1,6 @@
+Date & Time,Amount Outgoing (Yen),Amount Incoming (Yen),Balance,Detail,Status,Note,Transaction Type,Business Name,Method,Transaction ID
+2024/02/12 08:00,1200,-,0,-,-,-,Payment,Konbini Tokyo,PayPay Balance,TX001
+2024/02/13 19:30,1080,-,0,-,-,-,Payment,Ramen Ichiban Shop,PayPay Point (100yen),TX002
+2024/02/14 09:00,-,50000,0,-,-,-,Top-Up,Salary Corp,Bank,TX003
+2024/02/16 12:00,750,-,0,-,-,-,Payment,Vergessener Laden,PayPay Balance,TX004
+2024/02/17 12:00,300,-,0,-,-,-,Payment,Nur Punkte,PayPay Point,TX005

@@ -1,12 +1,16 @@
 import { AppStore } from '../store/AppStore.js';
 import { I18nService } from '../services/I18nService.js';
-import { CompareManager } from '../services/CompareManager.js';
+import { escapeHtml } from '../../../assets/js/dom.js';
+import { colorAt } from './palette.js';
+import { Preferences, applyTheme } from '../../../assets/js/preferences.js';
 
 export class UIManager {
     static init() {
         this.bindEvents();
         AppStore.subscribe(state => this.render(state));
         this.updateTheme(AppStore.state.ui.theme);
+
+        this.render(AppStore.state);
     }
 
     static render(state) {
@@ -19,75 +23,103 @@ export class UIManager {
             this.syncComparisonYears(state);
             this.updateViewVisibility(state.ui.currentView);
             this.renderCategoryModalList(state);
-            I18nService.updateDOM();
+            this.renderMissingRatesWarning(state);
         }
+
+        I18nService.updateDOM();
+        const langSwitcher = document.getElementById('lang-switcher');
+        if (langSwitcher) langSwitcher.value = state.ui.currentLang;
+    }
+
+    static showUploadError(messageKey) {
+        const el = document.getElementById('upload-error');
+        if (!el) return;
+        el.textContent = messageKey ? I18nService.get(messageKey) : '';
+        el.classList.toggle('hidden', !messageKey);
     }
 
     static renderCategoryModalList(state) {
         const container = document.getElementById('category-list-container');
         if (!container) return;
 
-        const uniqueCats = [...new Set(state.transactions.map(t => t.displayCategory || 'Unkategorisiert'))].sort();
-        const activeCats = state.filters.categories;
+        // Rebuilding would drop the scroll position, so the markup is only
+        // replaced when the set of categories itself changed.
+        if (this.hasOutdatedCategoryList(container, state.categories)) {
+            this.rebuildCategoryList(container, state.categories);
+        }
+        this.syncCategoryCheckboxes(container, state.filters.categories);
+    }
 
-        container.innerHTML = uniqueCats.map(cat => `
+    static hasOutdatedCategoryList(container, categories) {
+        return container.dataset.categories !== categories.join('\u0000');
+    }
+
+    static rebuildCategoryList(container, categories) {
+        container.dataset.categories = categories.join('\u0000');
+        container.innerHTML = categories.map((category, index) => `
             <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
-                <input type="checkbox" id="cat-${cat}" value="${cat}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" ${activeCats.has(cat) ? 'checked' : ''}>
-                <label for="cat-${cat}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${cat}</label>
+                <input type="checkbox" id="cat-filter-${index}" value="${escapeHtml(category)}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600">
+                <label for="cat-filter-${index}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${escapeHtml(category)}</label>
             </div>
         `).join('');
+    }
 
+    static syncCategoryCheckboxes(container, selected) {
         container.querySelectorAll('.cat-filter-cb').forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                const newCats = new Set(AppStore.state.filters.categories);
-                if (e.target.checked) newCats.add(e.target.value);
-                else newCats.delete(e.target.value);
-                AppStore.update({ filters: { categories: newCats } });
-            });
+            cb.checked = selected.has(cb.value);
         });
+    }
+
+    static renderMissingRatesWarning(state) {
+        const banner = document.getElementById('missing-rates-warning');
+        if (!banner) return;
+
+        banner.classList.toggle('hidden', state.missingRates === 0);
+        if (state.missingRates > 0) {
+            banner.textContent = I18nService.format('missingRatesWarning', { count: state.missingRates });
+        }
     }
 
     static syncComparisonYears(state) {
         const container = document.getElementById('comparison-year-selector');
         if (!container) return;
 
-        const years = [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a,b) => b-a);
-        const colors = CompareManager.getColors();
+        const years = this.getYears(state);
 
-        if (container.children.length === years.length) return;
-
-        container.innerHTML = years.map((yr, idx) => {
-            const color = colors[idx % colors.length];
-            const isChecked = state.filters.comparisonYears.includes(yr.toString());
-            return `
-                <div class="relative">
-                    <input type="checkbox" id="yr-${yr}" class="year-checkbox" value="${yr}" ${isChecked ? 'checked' : ''}>
-                    <label for="yr-${yr}" class="year-checkbox-label flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-full" style="background-color: ${color}"></span>
-                        ${yr}
-                    </label>
-                </div>
-            `;
-        }).join('');
+        if (container.dataset.years !== years.join(',')) {
+            container.dataset.years = years.join(',');
+            container.innerHTML = years.map((yr, idx) => `
+                <label class="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <input type="checkbox" class="year-checkbox w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" value="${yr}">
+                    <span class="w-3 h-3 rounded-full" style="background-color: ${colorAt(idx)}"></span>
+                    ${yr}
+                </label>
+            `).join('');
+        }
 
         container.querySelectorAll('.year-checkbox').forEach(cb => {
-            cb.addEventListener('change', () => {
-                const checked = Array.from(container.querySelectorAll('.year-checkbox:checked')).map(c => c.value);
-                AppStore.update({ filters: { comparisonYears: checked } });
-            });
+            cb.checked = state.filters.comparisonYears.includes(cb.value);
         });
     }
 
+    static getYears(state) {
+        return [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a, b) => b - a);
+    }
+
     static updateTheme(theme) {
-        const isDark = theme === 'dark';
-        document.documentElement.classList.toggle('dark', isDark);
-        document.getElementById('theme-icon-light')?.classList.toggle('hidden', isDark);
-        document.getElementById('theme-icon-dark')?.classList.toggle('hidden', !isDark);
+        applyTheme(theme);
     }
 
     static updateViewVisibility(view) {
         document.querySelectorAll('.view-container').forEach(v => v.classList.toggle('hidden', v.id !== `${view}-view`));
         document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+
+        const filterRow = document.getElementById('filter-row');
+        if (filterRow) filterRow.dataset.view = view;
+
+        document.querySelectorAll('.filter-control').forEach(control => {
+            control.classList.toggle('hidden', !control.dataset.views.split(' ').includes(view));
+        });
     }
 
     static syncFilterDropdowns(state) {
@@ -95,25 +127,40 @@ export class UIManager {
         const m = document.getElementById('month-select');
         const c = document.getElementById('currency-select');
 
-        if (y && y.options.length <= 1) {
-            const years = [...new Set(state.transactions.map(t => new Date(t.date).getFullYear()))].sort((a,b) => b-a);
-            y.innerHTML = `<option value="all">${I18nService.get('yearAll')}</option>`;
-            years.forEach(yr => y.add(new Option(yr, yr)));
+        if (y) {
+            const years = this.getYears(state);
+            if (y.dataset.years !== years.join(',')) {
+                y.dataset.years = years.join(',');
+                y.innerHTML = '<option value="all" data-i18n-key="yearAll"></option>';
+                years.forEach(yr => y.add(new Option(yr, yr)));
+            }
         }
 
         if (y) y.value = state.filters.year;
         if (m) m.value = state.filters.month;
         if (c) c.value = state.ui.currencySelect;
+
+        this.setSelectValue('timeframe-select', state.filters.timelineTimeframe);
+        this.setSelectValue('timeline-mode-select', state.filters.timelineMode);
+        this.setSelectValue('comparison-data-type-select', state.filters.comparisonType);
+        this.setSelectValue('comparison-chart-type-select', state.filters.comparisonChartType);
+    }
+
+    static setSelectValue(id, value) {
+        const select = document.getElementById(id);
+        if (select) select.value = value;
     }
 
     static bindEvents() {
         document.getElementById('theme-toggle')?.addEventListener('click', () => {
-            const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            const newTheme = AppStore.state.ui.theme === 'dark' ? 'light' : 'dark';
             this.updateTheme(newTheme);
+            Preferences.saveTheme(newTheme);
             AppStore.update({ ui: { theme: newTheme } });
         });
 
         document.getElementById('lang-switcher')?.addEventListener('change', (e) => {
+            Preferences.saveLanguage(e.target.value);
             AppStore.update({ ui: { currentLang: e.target.value } });
         });
 
@@ -125,20 +172,39 @@ export class UIManager {
         document.getElementById('month-select')?.addEventListener('change', e => AppStore.update({ filters: { month: e.target.value } }));
         document.getElementById('currency-select')?.addEventListener('change', e => AppStore.update({ ui: { currencySelect: e.target.value } }));
 
-        document.querySelectorAll('.comparison-view-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const isBar = btn.id.includes('bar');
-                AppStore.update({ filters: { comparisonChartType: isBar ? 'bar' : 'pie' } });
-            });
+        document.getElementById('comparison-chart-type-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { comparisonChartType: e.target.value } });
         });
 
         document.getElementById('comparison-data-type-select')?.addEventListener('change', e => {
             AppStore.update({ filters: { comparisonType: e.target.value } });
         });
 
+        document.getElementById('timeframe-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { timelineTimeframe: e.target.value } });
+        });
+
+        document.getElementById('timeline-mode-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { timelineMode: e.target.value } });
+        });
+
         const filterBtn = document.getElementById('open-category-modal-btn');
         const categoryModal = document.getElementById('category-modal');
         const closeBtn = document.getElementById('close-category-modal-btn');
+
+        document.getElementById('comparison-year-selector')?.addEventListener('change', (e) => {
+            if (!e.target.classList.contains('year-checkbox')) return;
+            const checked = [...e.currentTarget.querySelectorAll('.year-checkbox:checked')].map(c => c.value);
+            AppStore.update({ filters: { comparisonYears: checked } });
+        });
+
+        document.getElementById('category-list-container')?.addEventListener('change', (e) => {
+            if (!e.target.classList.contains('cat-filter-cb')) return;
+            const categories = new Set(AppStore.state.filters.categories);
+            if (e.target.checked) categories.add(e.target.value);
+            else categories.delete(e.target.value);
+            AppStore.update({ filters: { categories } });
+        });
 
         if (filterBtn && categoryModal) {
             filterBtn.addEventListener('click', () => categoryModal.classList.remove('hidden'));
@@ -151,8 +217,7 @@ export class UIManager {
         }
 
         document.getElementById('select-all-btn')?.addEventListener('click', () => {
-            const allCats = new Set(AppStore.state.transactions.map(t => t.displayCategory || 'Unkategorisiert'));
-            AppStore.update({ filters: { categories: allCats } });
+            AppStore.update({ filters: { categories: new Set(AppStore.state.categories) } });
         });
 
         document.getElementById('deselect-all-btn')?.addEventListener('click', () => {

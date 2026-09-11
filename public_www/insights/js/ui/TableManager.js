@@ -1,4 +1,7 @@
 import { AppStore } from '../store/AppStore.js';
+import { escapeHtml } from '../../../assets/js/dom.js';
+import { CurrencyService } from '../services/CurrencyService.js';
+import { I18nService } from '../services/I18nService.js';
 
 export class TableManager {
     static init() {
@@ -12,7 +15,7 @@ export class TableManager {
     }
 
     static render(state, searchTerm = '') {
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
         const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency });
 
         this.renderDashboardTable(state, formatter);
@@ -21,27 +24,25 @@ export class TableManager {
 
         const tbody = document.querySelector('#transactions-table-body');
         if (tbody) {
-            let filtered = state.processedTransactions;
-
-            if (state.filters.year !== 'all') {
-                filtered = filtered.filter(t => new Date(t.date).getFullYear().toString() === state.filters.year);
-            }
-            if (state.filters.month !== 'all') {
-                filtered = filtered.filter(t => (new Date(t.date).getMonth() + 1).toString().padStart(2, '0') === state.filters.month);
-            }
+            let filtered = state.fullyFilteredTransactions;
 
             if (searchTerm) {
                 filtered = filtered.filter(t =>
                     (t.description || '').toLowerCase().includes(searchTerm) ||
-                    t.displayCategory.toLowerCase().includes(searchTerm)
+                    t.category.toLowerCase().includes(searchTerm)
                 );
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('noTransactionsForFilter'))}</td></tr>`;
+                return;
             }
 
             tbody.innerHTML = filtered.map(t => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm">
-                    <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${new Date(t.date).toLocaleDateString()}</td>
-                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${t.displayCategory}</td>
-                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${t.description || '-'}</td>
+                    <td class="px-6 py-4 text-slate-500 whitespace-nowrap">${I18nService.formatDate(t.date)}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(t.category)}</td>
+                    <td class="px-6 py-4 text-slate-600 dark:text-slate-400 truncate max-w-xs">${escapeHtml(t.description || '-')}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}">
                         ${t.type === 'income' ? '+' : '-'}${formatter.format(t.displayAmount)}
                     </td>
@@ -54,22 +55,22 @@ export class TableManager {
     }
 
     static renderDashboardTable(state, formatter) {
-        const data = state.timeFilteredTransactions;
+        const data = state.fullyFilteredTransactions;
         const tbody = document.querySelector('#dashboard-view table tbody');
         if (!tbody) return;
 
         const cats = {};
         data.forEach(t => {
-            if (!cats[t.displayCategory]) cats[t.displayCategory] = { inc: 0, exp: 0 };
-            if (t.type === 'income') cats[t.displayCategory].inc += t.displayAmount;
-            else cats[t.displayCategory].exp += t.displayAmount;
+            if (!cats[t.category]) cats[t.category] = { inc: 0, exp: 0 };
+            if (t.type === 'income') cats[t.category].inc += t.displayAmount;
+            else cats[t.category].exp += t.displayAmount;
         });
 
         tbody.innerHTML = Object.entries(cats)
             .sort((a,b) => b[1].exp - a[1].exp)
             .map(([name, val]) => `
                 <tr class="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${name}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">${escapeHtml(name)}</td>
                     <td class="px-6 py-4 text-right text-green-600 whitespace-nowrap">${val.inc > 0 ? formatter.format(val.inc) : '-'}</td>
                     <td class="px-6 py-4 text-right text-red-600 whitespace-nowrap">${val.exp > 0 ? formatter.format(val.exp) : '-'}</td>
                     <td class="px-6 py-4 text-right font-bold whitespace-nowrap">${formatter.format(val.inc - val.exp)}</td>
@@ -81,14 +82,19 @@ export class TableManager {
         const container = document.getElementById('category-details-container');
         if (!container) return;
 
-        const data = state.timeFilteredTransactions;
+        const data = state.fullyFilteredTransactions;
         const cats = {};
 
         data.forEach(t => {
-            if (!cats[t.displayCategory]) cats[t.displayCategory] = { inc: 0, exp: 0 };
-            if (t.type === 'income') cats[t.displayCategory].inc += t.displayAmount;
-            else cats[t.displayCategory].exp += t.displayAmount;
+            if (!cats[t.category]) cats[t.category] = { inc: 0, exp: 0 };
+            if (t.type === 'income') cats[t.category].inc += t.displayAmount;
+            else cats[t.category].exp += t.displayAmount;
         });
+
+        if (Object.keys(cats).length === 0) {
+            container.innerHTML = `<p class="text-sm text-slate-500 dark:text-slate-400" data-i18n-key="noCategoryData">${escapeHtml(I18nService.get('noCategoryData'))}</p>`;
+            return;
+        }
 
         container.innerHTML = Object.entries(cats)
             .sort((a, b) => b[1].exp - a[1].exp)
@@ -96,19 +102,19 @@ export class TableManager {
                 const net = val.inc - val.exp;
                 return `
                 <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
-                    <h4 class="font-bold text-slate-900 dark:text-white mb-3 truncate" title="${name}">${name}</h4>
+                    <h4 class="font-bold text-slate-900 dark:text-white mb-3 truncate" title="${escapeHtml(name)}">${escapeHtml(name)}</h4>
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
-                            <span class="text-slate-500 dark:text-slate-400">Einnahmen:</span>
+                            <span class="text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('income'))}</span>
                             <span class="text-green-600 font-medium">${val.inc > 0 ? formatter.format(val.inc) : '-'}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-slate-500 dark:text-slate-400">Ausgaben:</span>
+                            <span class="text-slate-500 dark:text-slate-400">${escapeHtml(I18nService.get('expenses'))}</span>
                             <span class="text-red-600 font-medium">${val.exp > 0 ? formatter.format(val.exp) : '-'}</span>
                         </div>
                     </div>
                     <div class="flex justify-between text-sm mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <span class="font-medium text-slate-700 dark:text-slate-300">Netto:</span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">${escapeHtml(I18nService.get('net'))}</span>
                         <span class="font-bold whitespace-nowrap ${net >= 0 ? 'text-green-600' : 'text-red-600'}">${formatter.format(net)}</span>
                     </div>
                 </div>

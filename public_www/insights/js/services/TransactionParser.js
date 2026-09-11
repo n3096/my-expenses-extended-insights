@@ -1,97 +1,127 @@
-import { I18nService } from './I18nService.js';
+import { DEFAULT_CURRENCY } from './CurrencyService.js';
+
+const UNCATEGORIZED = 'Unkategorisiert';
+const CATEGORY_SEPARATOR = ' > ';
+
+const COLUMN_ALIASES = {
+    date: ['date', 'datum'],
+    amount: ['amount', 'betrag', 'summe'],
+    currency: ['currency', 'währung', 'curr'],
+    category: ['category', 'kategorie'],
+    description: ['description', 'verwendungszweck', 'payee']
+};
 
 export class TransactionParser {
+    /**
+     * @returns {{ transactions: Array, error: string|null }} `error` is a
+     *          translation key describing why nothing could be read.
+     */
     static parse(csvText) {
-        const delimiter = this.#detectDelimiter(csvText);
         const lines = csvText.trim().split(/\r?\n/);
+        if (lines.length < 2) return { transactions: [], error: 'emptyCsvError' };
 
-        if (lines.length < 2) return { transactions: [], alerts: [] };
+        const delimiter = this.#detectDelimiter(lines[0]);
+        const headers = this.#parseRow(lines[0], delimiter).map(h => h.toLowerCase());
+        const columns = this.#locateColumns(headers);
 
-        const headers = this.#parseCsvRow(lines.shift(), delimiter).map(h => h.trim().toLowerCase());
-
-        const idx = {
-            date: this.#findIdx(headers, ['date', 'datum']),
-            amount: this.#findIdx(headers, ['amount', 'betrag', 'summe']),
-            income: headers.indexOf('income'),
-            expense: headers.indexOf('expense'),
-            currency: this.#findIdx(headers, ['currency', 'währung', 'curr']),
-            category: this.#findIdx(headers, ['category', 'kategorie']),
-            desc: this.#findIdx(headers, ['description', 'verwendungszweck', 'payee'])
-        };
-
-        const rawTransactions = [];
-        lines.forEach((line, i) => {
-            const values = this.#parseCsvRow(line, delimiter);
-            if (values.length <= Math.max(idx.date, idx.amount === -1 ? 0 : idx.amount)) return;
-
-            const date = this.#parseDate(values[idx.date]);
-            if (isNaN(date.getTime())) return;
-
-            let amount = 0;
-            let type = 'expense';
-
-            if (idx.income !== -1 && idx.expense !== -1) {
-                const inc = this.#parseNumeric(values[idx.income]);
-                const exp = this.#parseNumeric(values[idx.expense]);
-                if (inc > 0) { amount = inc; type = 'income'; }
-                else { amount = exp; type = 'expense'; }
-            } else {
-                const val = this.#parseNumeric(values[idx.amount]);
-                amount = Math.abs(val);
-                type = val >= 0 ? 'income' : 'expense';
-            }
-
-            const rawCat = idx.category !== -1 ? (values[idx.category] || '') : '';
-            const mainCategory = rawCat.includes(' > ') ? rawCat.split(' > ')[0].trim() : rawCat.trim();
-
-            let currency = 'EUR';
-            if (idx.currency !== -1 && values[idx.currency]) {
-                currency = values[idx.currency].trim().toUpperCase();
-            }
-
-            rawTransactions.push({
-                id: `t-${i}-${Date.now()}`,
-                date: date.toISOString(),
-                amount,
-                type,
-                currency,
-                category: mainCategory || 'Unkategorisiert',
-                description: idx.desc !== -1 ? (values[idx.desc] || '') : ''
-            });
-        });
-
-        return { transactions: rawTransactions, alerts: [] };
-    }
-
-    static #detectDelimiter(text) {
-        const firstLine = text.split('\n')[0];
-        return firstLine.includes(';') ? ';' : ',';
-    }
-
-    static #parseCsvRow(row, delimiter) {
-        const regex = new RegExp(`${delimiter}(?=(?:[^"]*"[^"]*")*[^"]*$)`);
-        return row.split(regex).map(v => v.replace(/^"|"$/g, '').trim());
-    }
-
-    static #findIdx(headers, aliases) {
-        return headers.findIndex(h => aliases.some(a => h.includes(a)));
-    }
-
-    static #parseNumeric(val) {
-        if (!val) return 0;
-        const clean = val.replace(/[^0-9,\.-]/g, '');
-        if (clean.includes(',') && clean.includes('.')) return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
-        return parseFloat(clean.replace(',', '.'));
-    }
-
-    static #parseDate(str) {
-        const parts = str.split(/[./-]/);
-        if (parts.length === 3) {
-            let [d, m, y] = parts;
-            if (d.length === 4) [y, m, d] = parts;
-            const fullYear = y.length === 2 ? `20${y}` : y;
-            return new Date(fullYear, m - 1, d, 12, 0, 0);
+        if (!this.#hasRequiredColumns(columns)) {
+            return { transactions: [], error: 'csvMissingColumns' };
         }
-        return new Date(str);
+
+        const transactions = lines.slice(1)
+            .map((line, i) => this.#toTransaction(this.#parseRow(line, delimiter), columns, i))
+            .filter(Boolean);
+
+        return { transactions, error: transactions.length ? null : 'emptyCsvError' };
+    }
+
+    static #locateColumns(headers) {
+        const columns = Object.fromEntries(
+            Object.entries(COLUMN_ALIASES).map(([name, aliases]) => [
+                name,
+                headers.findIndex(h => aliases.some(alias => h.includes(alias)))
+            ])
+        );
+        // "Income"/"Expense" are matched exactly - "amount" style aliases would
+        // also hit them and pick the wrong column.
+        columns.income = headers.indexOf('income');
+        columns.expense = headers.indexOf('expense');
+        return columns;
+    }
+
+    static #hasRequiredColumns(columns) {
+        const hasAmount = columns.amount !== -1 || (columns.income !== -1 && columns.expense !== -1);
+        return columns.date !== -1 && hasAmount;
+    }
+
+    static #toTransaction(values, columns, index) {
+        const date = this.#parseDate(values[columns.date]);
+        if (!date) return null;
+
+        const { amount, type } = this.#parseAmount(values, columns);
+        if (amount === 0) return null;
+
+        return {
+            id: `t-${index}`,
+            date: date.toISOString(),
+            amount,
+            type,
+            currency: this.#valueAt(values, columns.currency).toUpperCase() || DEFAULT_CURRENCY,
+            category: this.#parseCategory(this.#valueAt(values, columns.category)),
+            description: this.#valueAt(values, columns.description)
+        };
+    }
+
+    static #parseAmount(values, columns) {
+        if (columns.income !== -1 && columns.expense !== -1) {
+            const income = this.#parseNumeric(values[columns.income]);
+            if (income > 0) return { amount: income, type: 'income' };
+            return { amount: Math.abs(this.#parseNumeric(values[columns.expense])), type: 'expense' };
+        }
+
+        const value = this.#parseNumeric(values[columns.amount]);
+        return { amount: Math.abs(value), type: value >= 0 ? 'income' : 'expense' };
+    }
+
+    static #parseCategory(raw) {
+        const main = raw.includes(CATEGORY_SEPARATOR) ? raw.split(CATEGORY_SEPARATOR)[0] : raw;
+        return main.trim() || UNCATEGORIZED;
+    }
+
+    static #valueAt(values, index) {
+        return index === -1 ? '' : (values[index] ?? '').trim();
+    }
+
+    static #detectDelimiter(headerLine) {
+        return headerLine.includes(';') ? ';' : ',';
+    }
+
+    static #parseRow(row, delimiter) {
+        const splitOutsideQuotes = new RegExp(`${delimiter}(?=(?:[^"]*"[^"]*")*[^"]*$)`);
+        return row.split(splitOutsideQuotes).map(v => v.replace(/^"|"$/g, '').trim());
+    }
+
+    static #parseNumeric(value) {
+        if (!value) return 0;
+        const clean = value.replace(/[^0-9,.-]/g, '');
+        const normalized = clean.includes(',') && clean.includes('.')
+            ? clean.replace(/\./g, '').replace(',', '.')  // 1.234,56
+            : clean.replace(',', '.');
+        const parsed = parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    /** Accepts dd.MM.yy(yy), dd/MM/yyyy and yyyy-MM-dd. Returns null if unusable. */
+    static #parseDate(value) {
+        const parts = String(value ?? '').split(/[./-]/);
+        if (parts.length !== 3 || parts.some(part => !part)) return null;
+
+        let [day, month, year] = parts;
+        if (day.length === 4) [year, month, day] = parts;
+        if (year.length === 2) year = `20${year}`;
+
+        // Midday keeps the calendar day stable across time zones.
+        const date = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0);
+        return Number.isNaN(date.getTime()) ? null : date;
     }
 }

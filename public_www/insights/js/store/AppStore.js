@@ -1,10 +1,23 @@
+import { CurrencyService, DEFAULT_CURRENCY } from '../services/CurrencyService.js';
+import { FilterService } from '../services/FilterService.js';
+import { Preferences } from '../../../assets/js/preferences.js';
+
 export const AppStore = {
     state: {
         transactions: [],
+        /** All transactions, converted into the selected display currency. */
         processedTransactions: [],
+        /** processedTransactions restricted to the selected year/month. */
         timeFilteredTransactions: [],
+        /** processedTransactions restricted to the selected categories. */
+        categoryFilteredTransactions: [],
+        /** processedTransactions restricted to both year/month and categories. */
         fullyFilteredTransactions: [],
         exchangeRates: {},
+        /** Every category in the uploaded file, sorted - independent of any filter. */
+        categories: [],
+        /** Distinct day/currency rates that could not be loaded. */
+        missingRates: 0,
         filters: {
             year: 'all',
             month: 'all',
@@ -12,13 +25,14 @@ export const AppStore = {
             comparisonYears: [],
             comparisonType: 'net',
             comparisonChartType: 'bar',
-            showSubcategories: true
+            timelineTimeframe: '1y',
+            timelineMode: 'periodic'
         },
         ui: {
-            currentLang: 'de',
+            currentLang: Preferences.language(),
             currentView: 'dashboard',
             currencySelect: 'EUR_CONVERTED',
-            theme: 'dark'
+            theme: Preferences.theme()
         }
     },
 
@@ -26,19 +40,14 @@ export const AppStore = {
     subscribe(callback) { this.listeners.push(callback); },
 
     update(newState) {
-        if (newState.exchangeRates) {
-            this.mergeRates(newState.exchangeRates);
-            delete newState.exchangeRates;
-        }
-
-        const ui = newState.ui ? { ...this.state.ui, ...newState.ui } : this.state.ui;
-        const filters = newState.filters ? { ...this.state.filters, ...newState.filters } : this.state.filters;
+        const { exchangeRates, ...rest } = newState;
+        if (exchangeRates) this.mergeRates(exchangeRates);
 
         this.state = {
             ...this.state,
-            ...newState,
-            ui,
-            filters
+            ...rest,
+            ui: rest.ui ? { ...this.state.ui, ...rest.ui } : this.state.ui,
+            filters: rest.filters ? { ...this.state.filters, ...rest.filters } : this.state.filters
         };
 
         this.processData();
@@ -70,49 +79,65 @@ export const AppStore = {
     },
 
     getRate(dateStr, currency) {
-        if (!currency || currency === 'EUR') return 1;
-        const d = new Date(dateStr);
-        const year = d.getUTCFullYear().toString();
-        const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
-        const day = d.getUTCDate().toString().padStart(2, '0');
-        const yearData = this.state.exchangeRates[year];
-        if (!yearData) return null;
-        const monthData = yearData[month];
+        if (!currency || currency === DEFAULT_CURRENCY) return 1;
+
+        // Transactions carry a local calendar day, so the lookup must use local parts.
+        const date = new Date(dateStr);
+        const year = date.getFullYear().toString();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+
+        const monthData = this.state.exchangeRates[year]?.[month];
         if (!monthData) return null;
-        const rates = monthData[day] || monthData[Object.keys(monthData).sort()[0]];
-        return (rates && rates[currency]) ? rates[currency] : null;
+
+        const rates = monthData[day] ?? this.nearestDayRates(monthData, day);
+        return rates?.[currency] ?? null;
+    },
+
+    /** Weekends and holidays have no published rate, so fall back to the closest day. */
+    nearestDayRates(monthData, day) {
+        const days = Object.keys(monthData).sort();
+        if (!days.length) return null;
+        const target = Number(day);
+        const closest = days.reduce((best, current) =>
+            Math.abs(Number(current) - target) < Math.abs(Number(best) - target) ? current : best
+        );
+        return monthData[closest];
     },
 
     processData() {
         const { transactions, ui, filters } = this.state;
-        if (!transactions.length) return;
-        const targetCurrency = ui.currencySelect.split('_')[0].toUpperCase();
-        this.state.processedTransactions = transactions.map(t => {
-            const transCurrency = (t.currency || 'EUR').toUpperCase();
-            const sourceRate = this.getRate(t.date, transCurrency);
-            const targetRate = this.getRate(t.date, targetCurrency);
-            let displayAmount = t.amount;
-            if (sourceRate && targetRate) {
-                displayAmount = (t.amount / sourceRate) * targetRate;
-            }
-            return {
-                ...t,
-                displayAmount,
-                displayCategory: t.category || 'Unkategorisiert'
-            };
-        });
+        if (!transactions.length) {
+            this.state.categories = [];
+            this.state.missingRates = 0;
+            this.state.processedTransactions = [];
+            this.state.timeFilteredTransactions = [];
+            this.state.categoryFilteredTransactions = [];
+            this.state.fullyFilteredTransactions = [];
+            return;
+        }
+        this.state.categories = [...new Set(transactions.map(t => t.category))].sort();
 
-        this.state.timeFilteredTransactions = this.state.processedTransactions.filter(t => {
-            const date = new Date(t.date);
-            const yearMatch = filters.year === 'all' || date.getFullYear().toString() === filters.year;
-            const monthMatch = filters.month === 'all' || (date.getMonth() + 1).toString().padStart(2, '0') === filters.month.padStart(2, '0');
-            return yearMatch && monthMatch;
-        });
-
-        this.state.fullyFilteredTransactions = this.state.timeFilteredTransactions.filter(t =>
-            filters.categories.has(t.displayCategory)
+        const { transactions: processed, missingRates } = CurrencyService.process(
+            transactions,
+            ui.currencySelect,
+            (date, currency) => this.getRate(date, currency)
         );
+        this.state.processedTransactions = processed;
+        this.state.missingRates = missingRates;
+
+        this.state.timeFilteredTransactions = FilterService.byPeriod(processed, filters);
+        this.state.categoryFilteredTransactions = FilterService.byCategory(processed, filters);
+        this.state.fullyFilteredTransactions = FilterService.byCategory(this.state.timeFilteredTransactions, filters);
     },
 
-    notify() { this.listeners.forEach(cb => cb(this.state)); }
+    notify() {
+        this.listeners.forEach(cb => {
+            try {
+                cb(this.state);
+            } catch (error) {
+                console.error('Store subscriber failed:', error);
+            }
+        });
+    }
 };

@@ -1,4 +1,9 @@
 import { AppStore } from '../store/AppStore.js';
+import { I18nService } from '../services/I18nService.js';
+import { CurrencyService } from '../services/CurrencyService.js';
+import { ACCENT_COLOR, CHART_COLORS, colorAt } from './palette.js';
+
+const WEEKS_IN_SHORT_TIMEFRAME = 5;
 
 export class ChartManager {
     static instances = new Map();
@@ -10,19 +15,19 @@ export class ChartManager {
     }
 
     static update(state) {
-        const currency = state.ui.currencySelect.split('_')[0];
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
         const formatter = new Intl.NumberFormat(undefined, { style: 'currency', currency });
 
         if (state.ui.currentView === 'dashboard') {
-            const data = state.timeFilteredTransactions;
+            const data = state.fullyFilteredTransactions;
             const income = data.filter(t => t.type === 'income').reduce((s,t) => s + t.displayAmount, 0);
             const expenses = data.filter(t => t.type === 'expense').reduce((s,t) => s + t.displayAmount, 0);
 
-            this.setTxt('total-income', formatter.format(income));
-            this.setTxt('total-expenses', formatter.format(-expenses));
-            this.setTxt('net-savings', formatter.format(income - expenses));
+            this.setText('total-income', formatter.format(income));
+            this.setText('total-expenses', formatter.format(-expenses));
+            this.setText('net-savings', formatter.format(income - expenses));
 
-            this.renderExpenseChart(state.timeFilteredTransactions);
+            this.renderExpenseChart(data);
         }
 
         if (state.ui.currentView === 'timeline') {
@@ -32,183 +37,280 @@ export class ChartManager {
     }
 
     static renderCategoryTimeline(state) {
-        const canvas = document.getElementById('timeline-chart');
-        if (!canvas) return;
+        if (!document.getElementById('category-timeline-chart')) return;
 
-        const timeframe = document.getElementById('timeframe-select')?.value || '1y';
-        const type = document.getElementById('timeline-chart-type-select')?.value || 'periodic';
+        const { timelineTimeframe: timeframe, timelineMode: mode } = state.filters;
         const periods = this.getPeriods(state.processedTransactions, timeframe);
+        const netByPeriod = this.sumByPeriodAndCategory(state.processedTransactions, periods, timeframe);
 
-        const allSortedCats = [...new Set(state.processedTransactions.map(t => t.displayCategory))].sort();
-        const activeCategories = [...state.filters.categories];
+        const activeCategories = state.categories.filter(cat => state.filters.categories.has(cat));
 
-        const datasets = activeCategories.map((cat) => {
-            const colorIdx = allSortedCats.indexOf(cat);
+        const datasets = activeCategories.map(cat => {
+            const color = colorAt(state.categories.indexOf(cat));
             let running = 0;
-            const values = periods.map(p => {
-                const pData = state.processedTransactions.filter(t => this.isInPeriod(t.date, p, timeframe));
-                const inc = pData.filter(t => t.displayCategory === cat && t.type === 'income').reduce((s,t) => s + t.displayAmount, 0);
-                const exp = pData.filter(t => t.displayCategory === cat && t.type === 'expense').reduce((s,t) => s + t.displayAmount, 0);
 
-                const val = inc - exp;
-                if (type === 'cumulative') { running += val; return running; }
-                return val;
+            const values = periods.map(period => {
+                const value = netByPeriod.get(period.key)?.get(cat) ?? 0;
+                if (mode !== 'cumulative') return value;
+                running += value;
+                return running;
             });
 
             return {
                 label: cat,
                 data: values,
-                borderColor: this.getColors()[colorIdx % this.getColors().length],
-                backgroundColor: this.getColors()[colorIdx % this.getColors().length] + '22',
+                borderColor: color,
+                backgroundColor: `${color}22`,
                 tension: 0.3,
-                fill: type === 'cumulative',
+                fill: mode === 'cumulative',
                 pointRadius: 3
             };
         });
 
-        this.draw('timeline-chart', {
+        this.draw('category-timeline-chart', {
             type: 'line',
             data: { labels: periods.map(p => p.label), datasets },
-            options: this.getOptions(state, true)
+            options: this.getOptions(state, { allowNegative: true, showLegend: true })
         });
     }
 
     static renderTotalNetTimeline(state) {
-        const canvas = document.getElementById('total-timeline-chart');
-        if (!canvas) return;
+        if (!document.getElementById('net-timeline-chart')) return;
 
-        const timeframe = document.getElementById('timeframe-select')?.value || 'max';
-        const type = document.getElementById('timeline-chart-type-select')?.value || 'cumulative';
+        const { timelineTimeframe: timeframe, timelineMode: mode } = state.filters;
         const periods = this.getPeriods(state.processedTransactions, timeframe);
+        const netByPeriod = this.sumByPeriod(state.processedTransactions, periods, timeframe);
 
-        let runningNet = 0;
-        const allTimePeriods = this.getPeriods(state.processedTransactions, 'max');
-        const netDataMap = new Map();
+        let running = mode === 'cumulative'
+            ? this.netBefore(state.processedTransactions, periods[0])
+            : 0;
 
-        allTimePeriods.forEach(p => {
-            const d = state.processedTransactions.filter(t => this.isInPeriod(t.date, p, 'max'));
-            const inc = d.filter(t => t.type === 'income').reduce((s,t) => s + t.displayAmount, 0);
-            const exp = d.filter(t => t.type === 'expense').reduce((s,t) => s + t.displayAmount, 0);
-
-            const periodNet = inc - exp;
-            runningNet += periodNet;
-            netDataMap.set(p.key, { cumulative: runningNet, periodic: periodNet });
+        const values = periods.map(period => {
+            const periodic = netByPeriod.get(period.key) ?? 0;
+            if (mode !== 'cumulative') return periodic;
+            running += periodic;
+            return running;
         });
 
-        const displayValues = periods.map(p => {
-            const entry = netDataMap.get(p.key);
-            return entry ? entry[type] : 0;
-        });
-
-        this.draw('total-timeline-chart', {
+        this.draw('net-timeline-chart', {
             type: 'line',
             data: {
                 labels: periods.map(p => p.label),
                 datasets: [{
-                    label: type === 'cumulative' ? 'Gesamtvermögen' : 'Nettoergebnis',
-                    data: displayValues,
-                    borderColor: '#4F46E5',
-                    backgroundColor: '#4F46E522',
+                    label: I18nService.get(mode === 'cumulative' ? 'cumulative' : 'netResult'),
+                    data: values,
+                    borderColor: ACCENT_COLOR,
+                    backgroundColor: `${ACCENT_COLOR}22`,
                     fill: true,
                     tension: 0.1,
                     pointRadius: 2
                 }]
             },
-            options: this.getOptions(state, true)
+            options: this.getOptions(state, { allowNegative: true })
         });
     }
 
-    static getOptions(state, allowNegative) {
+    static netBefore(transactions, period) {
+        if (!period) return 0;
+        const start = this.periodStart(period).getTime();
+        return transactions
+            .filter(t => new Date(t.date).getTime() < start)
+            .reduce((total, t) => total + (t.type === 'income' ? t.displayAmount : -t.displayAmount), 0);
+    }
+
+    static periodStart(period) {
+        return period.start ?? new Date(period.year, period.month, 1);
+    }
+
+    static sumByPeriod(transactions, periods, timeframe) {
+        const totals = new Map();
+        this.forEachInPeriod(transactions, periods, timeframe, (period, transaction) => {
+            const signed = transaction.type === 'income' ? transaction.displayAmount : -transaction.displayAmount;
+            totals.set(period.key, (totals.get(period.key) ?? 0) + signed);
+        });
+        return totals;
+    }
+
+    static sumByPeriodAndCategory(transactions, periods, timeframe) {
+        const totals = new Map(periods.map(period => [period.key, new Map()]));
+        this.forEachInPeriod(transactions, periods, timeframe, (period, transaction) => {
+            const byCategory = totals.get(period.key);
+            const signed = transaction.type === 'income' ? transaction.displayAmount : -transaction.displayAmount;
+            byCategory.set(transaction.category, (byCategory.get(transaction.category) ?? 0) + signed);
+        });
+        return totals;
+    }
+
+    static forEachInPeriod(transactions, periods, timeframe, callback) {
+        const byKey = new Map(periods.map(period => [period.key, period]));
+        transactions.forEach(transaction => {
+            const period = this.periodOf(transaction.date, periods, byKey, timeframe);
+            if (period) callback(period, transaction);
+        });
+    }
+
+    static periodOf(dateStr, periods, byKey, timeframe) {
+        const date = new Date(dateStr);
+        if (timeframe === '1m') {
+            return periods.find(p => date >= p.start && date < p.end) ?? null;
+        }
+        return byKey.get(this.monthKey(date)) ?? null;
+    }
+
+    static monthKey(date) {
+        return `${(date.getMonth() + 1).toString().padStart(2, '0')}.${date.getFullYear()}`;
+    }
+
+    static getOptions(state, { allowNegative = false, showLegend = false } = {}) {
+        const isDark = state.ui.theme === 'dark';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const gridColor = isDark ? '#334155' : '#e2e8f0';
+        const { currency } = CurrencyService.parseSelection(state.ui.currencySelect);
+
         return {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
+                x: {
+                    ticks: { color: textColor },
+                    grid: { display: false }
+                },
                 y: {
                     beginAtZero: !allowNegative,
                     ticks: {
+                        color: textColor,
                         callback: (v) => new Intl.NumberFormat(undefined, {
-                            style: 'currency', currency: state.ui.currencySelect.split('_')[0], maximumSignificantDigits: 3
+                            style: 'currency', currency, maximumSignificantDigits: 3
                         }).format(v)
                     },
                     grid: {
-                        color: (ctx) => ctx.tick.value === 0 ? '#ef4444' : 'rgba(0,0,0,0.1)',
+                        color: (ctx) => ctx.tick.value === 0 ? '#ef4444' : gridColor,
                         lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1
                     }
                 }
             },
-            plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
+            plugins: {
+                legend: { display: showLegend, labels: { color: textColor } },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${I18nService.formatCurrency(ctx.parsed.y, currency)}`
+                    }
+                }
+            }
         };
     }
 
     static draw(id, config) {
-        if (this.instances.has(id)) this.instances.get(id).destroy();
+        this.destroy(id);
         const canvas = document.getElementById(id);
         if (canvas) this.instances.set(id, new Chart(canvas, config));
     }
 
-    static setTxt(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+    static destroy(id) {
+        this.instances.get(id)?.destroy();
+        this.instances.delete(id);
+    }
+
+    static setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
 
     static getPeriods(data, timeframe) {
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
+        const end = this.rangeEnd(data);
+
+        if (timeframe === '1m') return this.getWeeklyPeriods(end);
+
         let start;
-        const isWeekly = timeframe === '1m';
         if (timeframe === 'max') {
-            const dates = data.map(t => new Date(t.date)).sort((a,b) => a-b);
-            start = dates.length ? new Date(dates[0]) : new Date();
+            const earliest = this.extremeTimestamp(data, Math.min);
+            start = earliest === null ? new Date(end) : new Date(earliest);
             start.setDate(1);
         } else {
-            const count = parseInt(timeframe);
-            const unit = timeframe.slice(-1);
-            if (unit === 'y') {
-                start = new Date(now.getFullYear() - count, now.getMonth(), 1);
-            } else {
-                start = new Date(now.getFullYear(), now.getMonth() - count + 1, 1);
-            }
+            const count = parseInt(timeframe, 10);
+            start = timeframe.endsWith('y')
+                ? new Date(end.getFullYear() - count, end.getMonth(), 1)
+                : new Date(end.getFullYear(), end.getMonth() - count + 1, 1);
         }
+
         const periods = [];
-        let curr = new Date(start);
-        const endOfRange = new Date(now.getFullYear(), now.getMonth(), 1);
-        if (isWeekly) {
-            curr = new Date(now);
-            curr.setDate(now.getDate() - 28);
-            for (let i = 0; i < 5; i++) {
-                const ws = new Date(curr);
-                const we = new Date(curr);
-                we.setDate(curr.getDate() + 7);
-                periods.push({ key: `w-${ws.getTime()}`, label: `${ws.getDate().toString().padStart(2, '0')}.${(ws.getMonth() + 1).toString().padStart(2, '0')}.`, start: ws, end: we });
-                curr.setDate(curr.getDate() + 7);
-            }
-        } else {
-            while (curr <= endOfRange) {
-                const m = (curr.getMonth() + 1).toString().padStart(2, '0');
-                const y = curr.getFullYear();
-                periods.push({ key: `${m}.${y}`, label: `${m}.${y}`, month: curr.getMonth(), year: y });
-                curr.setMonth(curr.getMonth() + 1);
-            }
+        const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+        const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+        while (cursor <= lastMonth) {
+            const key = this.monthKey(cursor);
+            periods.push({ key, label: key, month: cursor.getMonth(), year: cursor.getFullYear() });
+            cursor.setMonth(cursor.getMonth() + 1);
         }
         return periods;
     }
 
-    static isInPeriod(dateStr, period, timeframe) {
-        const d = new Date(dateStr);
-        if (timeframe === '1m') return d >= period.start && d < period.end;
-        return d.getMonth() === period.month && d.getFullYear() === period.year;
+    static getWeeklyPeriods(end) {
+        const periods = [];
+        const cursor = new Date(end);
+        cursor.setDate(cursor.getDate() - 7 * (WEEKS_IN_SHORT_TIMEFRAME - 1));
+
+        for (let i = 0; i < WEEKS_IN_SHORT_TIMEFRAME; i++) {
+            const start = new Date(cursor);
+            const stop = new Date(cursor);
+            stop.setDate(cursor.getDate() + 7);
+            const label = `${start.getDate().toString().padStart(2, '0')}.${(start.getMonth() + 1).toString().padStart(2, '0')}.`;
+            periods.push({ key: `w-${start.getTime()}`, label, start, end: stop });
+            cursor.setDate(cursor.getDate() + 7);
+        }
+        return periods;
+    }
+
+    static rangeEnd(data) {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const latest = this.extremeTimestamp(data, Math.max);
+        if (latest === null) return now;
+        return new Date(Math.min(latest, now.getTime()));
+    }
+
+    /** Reduce rather than spread - a large export would overflow the argument list. */
+    static extremeTimestamp(data, pick) {
+        return data.reduce((best, t) => {
+            const time = new Date(t.date).getTime();
+            if (!Number.isFinite(time)) return best;
+            return best === null ? time : pick(best, time);
+        }, null);
     }
 
     static renderExpenseChart(data) {
         const canvas = document.getElementById('expense-chart');
         if (!canvas) return;
         const cats = {};
-        data.filter(t => t.type === 'expense').forEach(t => cats[t.displayCategory] = (cats[t.displayCategory] || 0) + t.displayAmount);
+        data.filter(t => t.type === 'expense').forEach(t => cats[t.category] = (cats[t.category] || 0) + t.displayAmount);
+
+        const isEmpty = Object.keys(cats).length === 0;
+        canvas.classList.toggle('hidden', isEmpty);
+        document.getElementById('no-expense-data')?.classList.toggle('hidden', !isEmpty);
+        if (isEmpty) {
+            this.destroy('expense-chart');
+            return;
+        }
+
         this.draw('expense-chart', {
             type: 'doughnut',
-            data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: this.getColors(), borderWidth: 1 }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: {
+                labels: Object.keys(cats),
+                datasets: [{ data: Object.values(cats), backgroundColor: CHART_COLORS, borderWidth: 1 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${I18nService.formatCurrency(ctx.raw, CurrencyService.parseSelection(AppStore.state.ui.currencySelect).currency)}`
+                        }
+                    }
+                }
+            }
         });
     }
 
-    static getColors() {
-        return ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#22D3EE', '#F472B6', '#A78BFA', '#FB7185', '#34D399', '#FBBF24', '#60A5FA', '#F87171', '#3B82F6', '#2DD4BF', '#F43F5E', '#8263FF', '#00C49F', '#FFBB28', '#FF8042', '#0088FE'];
-    }
 }

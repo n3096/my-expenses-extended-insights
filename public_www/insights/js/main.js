@@ -16,45 +16,66 @@ class App {
             TableManager.init();
             CompareManager.init();
             this.bindEvents();
-        } catch (e) { console.error(e); }
+
+            ExchangeRateService.checkAvailability();
+        } catch (e) {
+            console.error('Initialisation failed:', e);
+        }
     }
 
     static bindEvents() {
         document.getElementById('csv-file-input')?.addEventListener('change', (e) => this.handleUpload(e));
+        document.getElementById('reset-upload-btn')?.addEventListener('click', () => this.reset());
     }
 
     static async handleUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
 
+        UIManager.showUploadError(null);
         UIManager.setLoading(true);
-        const reader = new FileReader();
 
-        reader.onload = async (e) => {
-            try {
-                const { transactions } = TransactionParser.parse(e.target.result);
-                await ExchangeRateService.checkAvailability();
-                const { rates } = await ExchangeRateService.fetchRatesForTransactions(transactions);
+        try {
+            const { transactions, error } = TransactionParser.parse(await file.text());
 
-                const allCats = [...new Set(transactions.map(t => t.category))];
-
-                AppStore.update({
-                    transactions,
-                    exchangeRates: rates,
-                    filters: {
-                        categories: new Set(allCats),
-                        year: 'all',
-                        month: 'all',
-                        comparisonYears: []
-                    }
-                });
-            } catch (err) {
-                console.error("Upload Error:", err);
-            } finally {
-                UIManager.setLoading(false);
+            if (error) {
+                UIManager.showUploadError(error);
+                return;
             }
-        };
-        reader.readAsText(file);
+
+            if (!ExchangeRateService.isAvailable) await ExchangeRateService.checkAvailability();
+            const { rates } = await ExchangeRateService.fetchRatesForTransactions(transactions);
+
+            AppStore.update({
+                transactions,
+                exchangeRates: rates,
+                filters: {
+                    categories: new Set(transactions.map(t => t.category)),
+                    year: 'all',
+                    month: 'all',
+                    comparisonYears: []
+                }
+            });
+        } catch (err) {
+            console.error('Upload error:', err);
+            UIManager.showUploadError('uploadError');
+        } finally {
+            UIManager.setLoading(false);
+            // Clear the input so picking the same file again still fires `change`
+            // - otherwise a corrected re-upload of a rejected file does nothing.
+            event.target.value = '';
+        }
+    }
+
+    static reset() {
+        const input = document.getElementById('csv-file-input');
+        if (input) input.value = '';
+
+        UIManager.showUploadError(null);
+        AppStore.update({
+            transactions: [],
+            filters: { categories: new Set(), year: 'all', month: 'all', comparisonYears: [] }
+        });
     }
 }
 

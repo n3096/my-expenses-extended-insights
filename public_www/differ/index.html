@@ -32,39 +32,39 @@
     <aside class="lg:w-80 order-2 lg:order-1">
         <div class="sidebar bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 flex flex-col border border-slate-200 dark:border-slate-700">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="font-black text-xl tracking-tight" data-i18n="overview">Übersicht</h2>
+                <h2 class="font-black text-xl tracking-tight" data-i18n-key="overview">Übersicht</h2>
                 <button id="theme-toggle" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:ring-2 ring-indigo-500 transition-all">
                     <span class="dark:hidden">🌙</span><span class="hidden dark:inline">☀️</span>
                 </button>
             </div>
 
             <div class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-800/30">
-                <p class="text-[10px] uppercase font-black text-green-600 dark:text-green-400 mb-2" data-i18n="monthlySavings">Punkt-Ersparnisse</p>
-                <div id="savings-list" class="max-height-[200px] overflow-y-auto space-y-1 pr-1 text-xs font-mono">
-                    <p class="opacity-50 italic" data-i18n="noData">Noch keine Daten...</p>
+                <p class="text-[10px] uppercase font-black text-green-600 dark:text-green-400 mb-2" data-i18n-key="monthlySavings">Punkt-Ersparnisse</p>
+                <div id="savings-list" class="max-h-[200px] overflow-y-auto space-y-1 pr-1 text-xs font-mono">
+                    <p class="opacity-50 italic" data-i18n-key="noData">Noch keine Daten...</p>
                 </div>
             </div>
 
             <div class="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
-                <p class="text-[10px] uppercase font-black text-indigo-600 dark:text-indigo-400 mb-2" data-i18n="balanceCheck">Bilanz-Check</p>
+                <p class="text-[10px] uppercase font-black text-indigo-600 dark:text-indigo-400 mb-2" data-i18n-key="balanceCheck">Bilanz-Check</p>
 
                 <div class="flex justify-between text-xs mb-1 opacity-70">
-                    <span data-i18n="theoreticalBalance">Theoretisch (Cash):</span>
+                    <span data-i18n-key="theoreticalBalance">Theoretisch (Cash):</span>
                     <span id="real-total-balance" class="font-mono">0 ¥</span>
                 </div>
 
                 <div class="flex justify-between text-xs mb-2 pb-2 border-b border-indigo-200/50 dark:border-indigo-700/50 text-green-600 dark:text-green-400">
-                    <span data-i18n="totalPoints">Gesparte Punkte:</span>
+                    <span data-i18n-key="totalPoints">Gesparte Punkte:</span>
                     <span id="total-points-sum" class="font-mono font-bold">+0 ¥</span>
                 </div>
 
                 <div class="space-y-1">
                     <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-bold uppercase opacity-50" data-i18n="realTotal">Effektive Bilanz:</span>
+                        <span class="text-[10px] font-bold uppercase opacity-50" data-i18n-key="realTotal">Effektive Bilanz:</span>
                         <span id="balance-delta" class="text-lg font-black text-indigo-600 dark:text-indigo-400">0 ¥</span>
                     </div>
                     <div class="flex justify-between items-center pt-1 border-t border-indigo-100 dark:border-indigo-900/50">
-                        <span class="text-[10px] font-bold uppercase opacity-50" data-i18n="appBalance">App Stand:</span>
+                        <span class="text-[10px] font-bold uppercase opacity-50" data-i18n-key="appBalance">App Stand:</span>
                         <span id="app-total-balance" class="text-sm font-bold opacity-80">0 ¥</span>
                     </div>
                 </div>
@@ -72,17 +72,24 @@
 
             <div class="space-y-3 flex-grow overflow-y-auto pr-2">
                 <div class="p-4 rounded-xl border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20">
-                    <p class="text-[10px] uppercase font-black text-orange-600 dark:text-orange-400" data-i18n="mismatches">Abweichungen</p>
+                    <p class="text-[10px] uppercase font-black text-orange-600 dark:text-orange-400" data-i18n-key="mismatches">Abweichungen</p>
                     <div class="flex justify-between items-end">
                         <p id="count-mismatch" class="text-2xl font-bold">0</p>
-                        <button onclick="scrollToNext('.status-mismatch')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400" data-i18n="jump">Springen</button>
+                        <button data-scroll-to=".status-mismatch" class="text-xs font-bold text-indigo-600 dark:text-indigo-400" data-i18n-key="jump">Springen</button>
                     </div>
                 </div>
                 <div class="p-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20">
-                    <p class="text-[10px] uppercase font-black text-red-600 dark:text-red-400" data-i18n="missingApp">Fehlend (App)</p>
+                    <p class="text-[10px] uppercase font-black text-red-600 dark:text-red-400" data-i18n-key="missingApp">Fehlend (App)</p>
                     <div class="flex justify-between items-end">
                         <p id="count-missing" class="text-2xl font-bold">0</p>
-                        <button onclick="scrollToNext('.status-missing')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400" data-i18n="jump">Springen</button>
+                        <button data-scroll-to=".status-missing" class="text-xs font-bold text-indigo-600 dark:text-indigo-400" data-i18n-key="jump">Springen</button>
+                    </div>
+                </div>
+                <div class="p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20">
+                    <p class="text-[10px] uppercase font-black text-rose-600 dark:text-rose-400" data-i18n-key="onlyInApp">Nur in App</p>
+                    <div class="flex justify-between items-end">
+                        <p id="count-extra" class="text-2xl font-bold">0</p>
+                        <button data-scroll-to=".status-extra" class="text-xs font-bold text-indigo-600 dark:text-indigo-400" data-i18n-key="jump">Springen</button>
                     </div>
                 </div>
             </div>
@@ -93,34 +100,39 @@
                     <option value="en">English</option>
                     <option value="ja">日本語</option>
                 </select>
-                <button onclick="window.location.href='../index.html'" class="w-full py-2 text-slate-500 hover:text-indigo-600 text-sm font-medium transition" data-i18n="back">Zurück</button>
+                <a href="../index.html" class="block w-full py-2 text-center text-slate-500 hover:text-indigo-600 text-sm font-medium transition" data-i18n-key="back">Zurück</a>
             </div>
         </div>
     </aside>
 
     <main class="flex-grow order-1 lg:order-2 space-y-6">
         <header class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700">
-            <h1 class="text-3xl font-black tracking-tighter mb-2" data-i18n="title">Transaction Differ</h1>
-            <p class="text-slate-500 dark:text-slate-400 text-sm mb-8" data-i18n="subtitle">Abgleich inklusive automatischer Punkte-Analyse.</p>
+            <h1 class="text-3xl font-black tracking-tighter mb-2" data-i18n-key="title">Transaction Differ</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mb-8" data-i18n-key="subtitle">Abgleich inklusive automatischer Punkte-Analyse.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-3" data-i18n="appFileLabel">1. myExpenses CSV</p>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-3" data-i18n-key="appFileLabel">1. myExpenses CSV</p>
                     <input type="file" id="app-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-300" accept=".csv">
                 </div>
                 <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 bg-slate-50/50 dark:bg-slate-900/50">
-                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-3" data-i18n="stmtFileLabel">2. Transactions CSVs</p>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-3" data-i18n-key="stmtFileLabel">2. Transactions CSVs</p>
                     <input type="file" id="statement-files" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900/30 dark:file:text-indigo-300" accept=".csv" multiple>
                 </div>
             </div>
-            <button id="run-btn" class="mt-8 w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-500/20 transition-all" data-i18n="runBtn">Differ ausführen</button>
+            <button id="run-btn" class="mt-8 w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-lg shadow-indigo-500/20 transition-all" data-i18n-key="runBtn">Differ ausführen</button>
+            <p id="run-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400 text-center"></p>
         </header>
 
         <div id="results" class="space-y-3 pb-24"></div>
     </main>
 </div>
 
-<script>
+<script type="module">
+    import { createTranslator, localeOf } from '../assets/js/i18n.js';
+    import { Preferences, initTheme } from '../assets/js/preferences.js';
+    import { escapeHtml } from '../assets/js/dom.js';
+
     const TRANSLATIONS = {
         de: {
             overview: "Übersicht", mismatches: "Abweichungen", missingApp: "Fehlend (App)",
@@ -130,7 +142,10 @@
             runBtn: "Differ ausführen", onlyInApp: "Nur in App", missingInApp: "In App vergessen",
             realAmount: "Real", monthlySavings: "Monatliche Ersparnis", balanceCheck: "Bilanz-Check",
             appBalance: "App Stand:", realTotal: "Effektive Bilanz:", theoreticalBalance: "Theoretisch (Cash):",
-            totalPoints: "Gesparte Punkte:", noData: "Keine Daten"
+            totalPoints: "Gesparte Punkte:", noData: "Keine Daten",
+            missingFiles: "Bitte beide Dateien auswählen.",
+            noTransactions: "In den gewählten Dateien wurden keine Transaktionen gefunden.",
+            readError: "Die Dateien konnten nicht gelesen werden."
         },
         en: {
             overview: "Overview", mismatches: "Mismatches", missingApp: "Missing (App)",
@@ -140,7 +155,10 @@
             runBtn: "Run Differ", onlyInApp: "Only in App", missingInApp: "Missing in App",
             realAmount: "Real", monthlySavings: "Monthly Savings", balanceCheck: "Balance Check",
             appBalance: "App Balance:", realTotal: "Effective Balance:", theoreticalBalance: "Theoretical (Cash):",
-            totalPoints: "Total Points:", noData: "No data"
+            totalPoints: "Total Points:", noData: "No data",
+            missingFiles: "Please select both files.",
+            noTransactions: "No transactions were found in the selected files.",
+            readError: "The files could not be read."
         },
         ja: {
             overview: "概要", mismatches: "不一致", missingApp: "アプリに不足",
@@ -150,228 +168,347 @@
             runBtn: "比較実行", onlyInApp: "アプリのみ", missingInApp: "アプリに未入力",
             realAmount: "実際", monthlySavings: "月間節約額", balanceCheck: "残高確認",
             appBalance: "アプリ残高:", realTotal: "実質残高:", theoreticalBalance: "理論値 (キャッシュ):",
-            totalPoints: "合計ポイント:", noData: "データなし"
+            totalPoints: "合計ポイント:", noData: "データなし",
+            missingFiles: "両方のファイルを選択してください。",
+            noTransactions: "選択したファイルに取引が見つかりませんでした。",
+            readError: "ファイルを読み込めませんでした。"
         }
     };
 
-    const state = {
-        lang: localStorage.getItem('lang') || 'de',
-        theme: localStorage.getItem('theme') || 'dark',
-        diffResults: []
-    };
+    const POINT_METHOD = 'PayPay Point';
+    const BALANCE_TOLERANCE_YEN = 10;
 
-    function updateUIStrings() {
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            if (TRANSLATIONS[state.lang][key]) el.innerText = TRANSLATIONS[state.lang][key];
-        });
+    const state = { diffResults: [], balances: null, savings: null };
+
+    const i18n = createTranslator(TRANSLATIONS, {
+        onChange: (lang) => {
+            Preferences.saveLanguage(lang);
+            document.getElementById('lang-select').value = lang;
+            renderDiff();
+        }
+    });
+
+    const t = (key) => i18n.get(key);
+
+
+    const yen = (amount) => `${amount.toLocaleString(localeOf(i18n.lang))} ¥`;
+
+    function showRunError(messageKey) {
+        const el = document.getElementById('run-error');
+        el.textContent = messageKey ? t(messageKey) : '';
+        el.classList.toggle('hidden', !messageKey);
     }
 
     class TransactionProcessor {
         static parseCSV(text) {
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
             if (!lines.length) return [];
-            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+
+            const headers = this.parseRow(lines[0]);
             return lines.slice(1).map(line => {
-                const values = [];
-                let current = '', inQuotes = false;
-                for (let char of line) {
-                    if (char === '"') inQuotes = !inQuotes;
-                    else if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; }
-                    else current += char;
-                }
-                values.push(current.trim());
-                return headers.reduce((obj, h, i) => ({ ...obj, [h]: values[i]?.replace(/"/g, '') }), {});
+                const values = this.parseRow(line);
+                const row = {};
+                headers.forEach((header, i) => { row[header] = values[i] ?? ''; });
+                return row;
             });
         }
 
-        static normalizeApp(data) {
-            return data.map(row => {
+        static parseRow(line) {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (const char of line) {
+                if (char === '"') inQuotes = !inQuotes;
+                else if (char === ',' && !inQuotes) { values.push(current.trim()); current = ''; }
+                else current += char;
+            }
+            values.push(current.trim());
+            return values;
+        }
+
+        static normalizeApp(rows) {
+            return rows.map(row => {
                 const income = parseFloat(row['Income']) || 0;
                 const expense = parseFloat(row['Expense']) || 0;
-                return { date: row['Date'], payee: row['Payee/Payer'], amount: Math.abs(income || expense), isIncome: income > 0 };
+                return {
+                    date: row['Date'] ?? '',
+                    payee: row['Payee/Payer'] ?? '',
+                    amount: Math.abs(income || expense),
+                    isIncome: income > 0
+                };
             }).filter(t => t.amount !== 0);
         }
 
-        static normalizeStatement(data) {
-            return data
-                .filter(row => row['Method'] !== 'PayPay Point')
-                .map(row => {
-                    const dateTime = row['Date & Time'] || '';
-                    const dateParts = dateTime.split(' ')[0]?.split('/') || [];
-                    const outgoing = parseFloat(row['Amount Outgoing (Yen)']?.replace(/,/g, '')) || 0;
-                    const incoming = parseFloat(row['Amount Incoming (Yen)']?.replace(/,/g, '')) || 0;
-                    const method = row['Method'] || '';
+        static normalizeStatement(rows) {
+            return rows
+                // Rows booked entirely in points have no cash counterpart in the app.
+                .filter(row => row['Method'] !== POINT_METHOD)
+                .map(row => this.toStatementItem(row))
+                .filter(item => item !== null);
+        }
 
-                    let pointsSpent = 0;
-                    if (method.includes('PayPay Point')) {
-                        const match = method.match(/PayPay Point \((\d+,?\d*)yen\)/);
-                        if (match) pointsSpent = parseInt(match[1].replace(/,/g, ''));
-                        else if (method.trim() === 'PayPay Point' && outgoing > 0) pointsSpent = outgoing;
-                    }
+        static toStatementItem(row) {
+            const date = this.parseDate(row['Date & Time']);
+            if (!date) return null;
 
-                    return {
-                        date: `${dateParts[2]?.padStart(2, '0')}.${dateParts[1]?.padStart(2, '0')}.${dateParts[0]?.slice(-2)}`,
-                        monthKey: `${dateParts[1]?.padStart(2, '0')}.${dateParts[0]}`,
-                        payee: row['Business Name'],
-                        amount: Math.abs(incoming || outgoing),
-                        isIncome: incoming > 0,
-                        id: row['Transaction ID'],
-                        pointsSaved: pointsSpent
-                    };
-                })
-                .filter(t => t.amount !== 0);
+            const outgoing = this.parseAmount(row['Amount Outgoing (Yen)']);
+            const incoming = this.parseAmount(row['Amount Incoming (Yen)']);
+            const amount = Math.abs(incoming || outgoing);
+            if (amount === 0) return null;
+
+            return {
+                date: `${date.day}.${date.month}.${date.year.slice(-2)}`,
+                monthKey: `${date.month}.${date.year}`,
+                payee: row['Business Name'] ?? '',
+                amount,
+                isIncome: incoming > 0,
+                id: row['Transaction ID'] ?? '',
+                pointsSaved: this.parsePointsSpent(row['Method'] ?? '')
+            };
+        }
+
+        /** "2024/03/15 12:30" -> { year, month, day }, padded. */
+        static parseDate(value) {
+            const parts = (value ?? '').split(' ')[0].split('/');
+            if (parts.length !== 3 || parts.some(part => !part)) return null;
+            const [year, month, day] = parts;
+            return { year, month: month.padStart(2, '0'), day: day.padStart(2, '0') };
+        }
+
+        static parseAmount(value) {
+            return parseFloat(String(value ?? '').replace(/,/g, '')) || 0;
+        }
+
+        /** A part-points payment reads "PayPay Point (1,200yen)". */
+        static parsePointsSpent(method) {
+            const match = method.match(/PayPay Point \((\d[\d,]*)\s*yen\)/i);
+            return match ? parseInt(match[1].replace(/,/g, ''), 10) : 0;
         }
     }
 
     function calculateDiff(appItems, stmtItems) {
-        const results = [];
-        const usedStmtIndices = new Set();
         const monthlySavings = {};
         let totalPointsSaved = 0;
 
-        const appDelta = appItems.reduce((acc, curr) => acc + (curr.isIncome ? curr.amount : -curr.amount), 0);
-        const realCashDelta = stmtItems.reduce((acc, curr) => acc + (curr.isIncome ? curr.amount : -curr.amount), 0);
-
         stmtItems.forEach(s => {
-            if (s.pointsSaved > 0) {
-                totalPointsSaved += s.pointsSaved;
-                monthlySavings[s.monthKey] = (monthlySavings[s.monthKey] || 0) + s.pointsSaved;
-            }
+            if (s.pointsSaved <= 0) return;
+            totalPointsSaved += s.pointsSaved;
+            monthlySavings[s.monthKey] = (monthlySavings[s.monthKey] || 0) + s.pointsSaved;
         });
 
-        const effectiveRealBalance = realCashDelta + totalPointsSaved;
+        state.balances = {
+            app: sumDelta(appItems),
+            realCash: sumDelta(stmtItems),
+            points: totalPointsSaved
+        };
+        state.savings = monthlySavings;
+        state.diffResults = matchTransactions(appItems, stmtItems).sort(byDateDescending);
 
-        document.getElementById('app-total-balance').innerText = `${appDelta.toLocaleString()} ¥`;
-        document.getElementById('real-total-balance').innerText = `${realCashDelta.toLocaleString()} ¥`;
-        document.getElementById('total-points-sum').innerText = `+${totalPointsSaved.toLocaleString()} ¥`;
+        renderDiff();
+    }
 
-        const deltaEl = document.getElementById('balance-delta');
-        deltaEl.innerText = `${effectiveRealBalance.toLocaleString()} ¥`;
+    function renderDiff() {
+        if (!state.balances) return;
+        renderBalances(state.balances);
+        renderSavings(state.savings);
+        renderResults();
+    }
 
-        const isBalanced = Math.abs(effectiveRealBalance - appDelta) < 10;
-        deltaEl.className = isBalanced ? 'text-lg font-black text-green-500' : 'text-lg font-black text-indigo-600 dark:text-indigo-400';
+    const sumDelta = (items) => items.reduce((total, item) => total + (item.isIncome ? item.amount : -item.amount), 0);
 
-        renderSavings(monthlySavings);
+    function byDateDescending(a, b) {
+        const key = (res) => ((res.app || res.stmt).date || '').split('.').reverse().join('');
+        return key(b).localeCompare(key(a));
+    }
+
+    function matchTransactions(appItems, stmtItems) {
+        const results = [];
+        const usedStmtIndices = new Set();
 
         appItems.forEach(app => {
-            const matchIdx = stmtItems.findIndex((s, i) =>
+            const exactIdx = stmtItems.findIndex((s, i) =>
                 !usedStmtIndices.has(i) && s.date === app.date && s.amount === app.amount && s.isIncome === app.isIncome
             );
 
-            if (matchIdx !== -1) {
-                results.push({ type: 'MATCH', app, stmt: stmtItems[matchIdx] });
-                usedStmtIndices.add(matchIdx);
-            } else {
-                const mismatchIdx = stmtItems.findIndex((s, i) =>
-                    !usedStmtIndices.has(i) && s.date === app.date && s.isIncome === app.isIncome &&
-                    (s.payee.toLowerCase().includes(app.payee.toLowerCase().split(' ')[0]))
-                );
-
-                if (mismatchIdx !== -1) {
-                    results.push({ type: 'MISMATCH', app, stmt: stmtItems[mismatchIdx] });
-                    usedStmtIndices.add(mismatchIdx);
-                } else {
-                    results.push({ type: 'EXTRA', app });
-                }
+            if (exactIdx !== -1) {
+                usedStmtIndices.add(exactIdx);
+                results.push({ type: 'MATCH', app, stmt: stmtItems[exactIdx] });
+                return;
             }
+
+            // Same day and direction but a different amount: most likely the
+            // same booking typed into the app with the wrong figure.
+            const payeeIdx = stmtItems.findIndex((s, i) =>
+                !usedStmtIndices.has(i) && s.date === app.date && s.isIncome === app.isIncome && payeeMatches(app.payee, s.payee)
+            );
+
+            if (payeeIdx !== -1) {
+                usedStmtIndices.add(payeeIdx);
+                results.push({ type: 'MISMATCH', app, stmt: stmtItems[payeeIdx] });
+                return;
+            }
+
+            results.push({ type: 'EXTRA', app });
         });
 
         stmtItems.forEach((s, i) => {
             if (!usedStmtIndices.has(i)) results.push({ type: 'MISSING', stmt: s });
         });
 
-        state.diffResults = results.sort((a, b) => {
-            const d1 = (a.app || a.stmt).date.split('.').reverse().join('');
-            const d2 = (b.app || b.stmt).date.split('.').reverse().join('');
-            return d2.localeCompare(d1);
-        });
-        renderResults();
+        return results;
+    }
+
+    function payeeMatches(appPayee, stmtPayee) {
+        const needle = String(appPayee ?? '').toLowerCase().split(' ')[0];
+        if (!needle) return false;
+        return String(stmtPayee ?? '').toLowerCase().includes(needle);
+    }
+
+    function renderBalances({ app, realCash, points }) {
+        const effectiveRealBalance = realCash + points;
+
+        document.getElementById('app-total-balance').textContent = yen(app);
+        document.getElementById('real-total-balance').textContent = yen(realCash);
+        document.getElementById('total-points-sum').textContent = `+${yen(points)}`;
+
+        const deltaEl = document.getElementById('balance-delta');
+        deltaEl.textContent = yen(effectiveRealBalance);
+
+        const isBalanced = Math.abs(effectiveRealBalance - app) < BALANCE_TOLERANCE_YEN;
+        deltaEl.className = isBalanced
+            ? 'text-lg font-black text-green-500'
+            : 'text-lg font-black text-indigo-600 dark:text-indigo-400';
     }
 
     function renderSavings(savings) {
         const container = document.getElementById('savings-list');
-        container.innerHTML = '';
-        const sortedKeys = Object.keys(savings).sort((a, b) => b.split('.').reverse().join('').localeCompare(a.split('.').reverse().join('')));
+        const sortedKeys = Object.keys(savings)
+            .sort((a, b) => b.split('.').reverse().join('').localeCompare(a.split('.').reverse().join('')));
 
         if (sortedKeys.length === 0) {
-            container.innerHTML = `<p class="opacity-50 italic" data-i18n="noData">Noch keine Daten...</p>`;
-            updateUIStrings();
+            container.innerHTML = `<p class="opacity-50 italic" data-i18n-key="noData">${escapeHtml(t('noData'))}</p>`;
             return;
         }
 
-        sortedKeys.forEach(key => {
-            const div = document.createElement('div');
-            div.className = "flex justify-between border-b border-green-200/30 dark:border-green-800/30 py-1";
-            div.innerHTML = `<span>${key}</span><span class="font-bold text-green-600 dark:text-green-400">+${savings[key].toLocaleString()} ¥</span>`;
-            container.appendChild(div);
-        });
+        container.innerHTML = sortedKeys.map(key => `
+            <div class="flex justify-between border-b border-green-200/30 dark:border-green-800/30 py-1">
+                <span>${escapeHtml(key)}</span>
+                <span class="font-bold text-green-600 dark:text-green-400">+${escapeHtml(yen(savings[key]))}</span>
+            </div>
+        `).join('');
     }
 
     function renderResults() {
         const container = document.getElementById('results');
-        const t = TRANSLATIONS[state.lang];
-        container.innerHTML = '';
-        let counts = { mismatch: 0, missing: 0 };
+        const counts = { mismatch: 0, missing: 0, extra: 0 };
 
-        state.diffResults.forEach((res, idx) => {
-            const card = document.createElement('div');
-            card.className = `diff-row p-5 rounded-2xl border shadow-md flex justify-between items-center cursor-pointer bg-white dark:bg-slate-800`;
-            const item = res.app || res.stmt;
-            const prefix = item.isIncome ? '+' : '-';
+        container.innerHTML = state.diffResults.map(res => {
+            if (res.type === 'MISMATCH') counts.mismatch++;
+            if (res.type === 'MISSING') counts.missing++;
+            if (res.type === 'EXTRA') counts.extra++;
+            return renderCard(res);
+        }).join('');
 
-            if (res.type === 'MATCH') {
-                card.classList.add('status-match');
-                card.innerHTML = `<div><p class="text-[10px] font-mono opacity-50">${item.date}</p><p class="font-bold">${item.payee}</p></div><div class="font-bold">${prefix}${item.amount.toLocaleString()} ¥</div>`;
-            } else if (res.type === 'MISMATCH') {
-                counts.mismatch++; card.classList.add('status-mismatch');
-                card.innerHTML = `<div><p class="text-[10px] text-orange-600 font-black">${res.app.date}</p><p class="font-bold">${res.app.payee}</p></div><div class="text-right"><p class="text-orange-600 font-black">${prefix}${res.app.amount.toLocaleString()} ¥</p><p class="text-[10px] opacity-60">${t.realAmount}: ${res.stmt.amount.toLocaleString()} ¥</p></div>`;
-            } else {
-                counts.missing++; card.classList.add(res.type === 'EXTRA' ? 'status-extra' : 'status-missing');
-                card.innerHTML = `<div><p class="text-[10px] font-black">${item.date}</p><p class="font-bold">${item.payee}</p><p class="text-xs opacity-60">${res.type === 'EXTRA' ? t.onlyInApp : t.missingInApp}</p></div><div class="font-black">${prefix}${item.amount.toLocaleString()} ¥</div>`;
-            }
-            card.onclick = () => card.classList.toggle('resolved');
-            container.appendChild(card);
-        });
-        document.getElementById('count-mismatch').innerText = counts.mismatch;
-        document.getElementById('count-missing').innerText = counts.missing;
+        document.getElementById('count-mismatch').textContent = counts.mismatch;
+        document.getElementById('count-missing').textContent = counts.missing;
+        document.getElementById('count-extra').textContent = counts.extra;
+    }
+
+    function renderCard(res) {
+        const item = res.app || res.stmt;
+        const sign = item.isIncome ? '+' : '-';
+        const amount = `${sign}${escapeHtml(yen(item.amount))}`;
+        const shell = (statusClass, body) =>
+            `<div class="diff-row ${statusClass} p-5 rounded-2xl border shadow-md flex justify-between items-center cursor-pointer bg-white dark:bg-slate-800">${body}</div>`;
+
+        if (res.type === 'MATCH') {
+            return shell('status-match', `
+                <div>
+                    <p class="text-[10px] font-mono opacity-50">${escapeHtml(item.date)}</p>
+                    <p class="font-bold">${escapeHtml(item.payee)}</p>
+                </div>
+                <div class="font-bold">${amount}</div>
+            `);
+        }
+
+        if (res.type === 'MISMATCH') {
+            return shell('status-mismatch', `
+                <div>
+                    <p class="text-[10px] text-orange-600 font-black">${escapeHtml(res.app.date)}</p>
+                    <p class="font-bold">${escapeHtml(res.app.payee)}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-orange-600 font-black">${amount}</p>
+                    <p class="text-[10px] opacity-60">${escapeHtml(t('realAmount'))}: ${escapeHtml(yen(res.stmt.amount))}</p>
+                </div>
+            `);
+        }
+
+        const isExtra = res.type === 'EXTRA';
+        return shell(isExtra ? 'status-extra' : 'status-missing', `
+            <div>
+                <p class="text-[10px] font-black">${escapeHtml(item.date)}</p>
+                <p class="font-bold">${escapeHtml(item.payee)}</p>
+                <p class="text-xs opacity-60">${escapeHtml(t(isExtra ? 'onlyInApp' : 'missingInApp'))}</p>
+            </div>
+            <div class="font-black">${amount}</div>
+        `);
     }
 
     function scrollToNext(selector) {
-        const targets = Array.from(document.querySelectorAll(selector)).filter(el => !el.classList.contains('resolved'));
-        if (targets.length > 0) targets[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const target = document.querySelector(`${selector}:not(.resolved)`);
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    document.getElementById('theme-toggle').addEventListener('click', () => {
-        state.theme = state.theme === 'dark' ? 'light' : 'dark';
-        document.documentElement.className = state.theme;
-        localStorage.setItem('theme', state.theme);
-    });
-
-    document.getElementById('lang-select').addEventListener('change', (e) => {
-        state.lang = e.target.value;
-        localStorage.setItem('lang', state.lang);
-        updateUIStrings();
-        if (state.diffResults.length > 0) renderResults();
-    });
-
-    document.getElementById('run-btn').addEventListener('click', async () => {
+    async function runDiff() {
         const appFile = document.getElementById('app-file').files[0];
         const stmtFiles = document.getElementById('statement-files').files;
-        if (!appFile || stmtFiles.length === 0) return;
-        const appData = TransactionProcessor.normalizeApp(TransactionProcessor.parseCSV(await appFile.text()));
-        const stmtMap = new Map();
-        for (let f of stmtFiles) {
-            TransactionProcessor.normalizeStatement(TransactionProcessor.parseCSV(await f.text())).forEach(s => stmtMap.set(s.id + s.amount + s.isIncome, s));
+
+        if (!appFile || stmtFiles.length === 0) {
+            showRunError('missingFiles');
+            return;
         }
-        calculateDiff(appData, Array.from(stmtMap.values()));
+        showRunError(null);
+
+        try {
+            const appItems = TransactionProcessor.normalizeApp(
+                TransactionProcessor.parseCSV(await appFile.text())
+            );
+
+            // Statements can overlap, so identical bookings are deduplicated.
+            const stmtMap = new Map();
+            for (const file of stmtFiles) {
+                TransactionProcessor
+                    .normalizeStatement(TransactionProcessor.parseCSV(await file.text()))
+                    .forEach(item => stmtMap.set(`${item.id}|${item.amount}|${item.isIncome}`, item));
+            }
+
+            if (appItems.length === 0 && stmtMap.size === 0) {
+                showRunError('noTransactions');
+                return;
+            }
+
+            calculateDiff(appItems, [...stmtMap.values()]);
+        } catch (error) {
+            console.error('Diff failed:', error);
+            showRunError('readError');
+        }
+    }
+
+    document.getElementById('lang-select').addEventListener('change', (e) => i18n.setLanguage(e.target.value));
+    document.getElementById('run-btn').addEventListener('click', runDiff);
+
+    document.getElementById('results').addEventListener('click', (e) => {
+        e.target.closest('.diff-row')?.classList.toggle('resolved');
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
-        document.documentElement.className = state.theme;
-        document.getElementById('lang-select').value = state.lang;
-        updateUIStrings();
+    document.querySelectorAll('[data-scroll-to]').forEach(btn => {
+        btn.addEventListener('click', () => scrollToNext(btn.dataset.scrollTo));
     });
+
+    initTheme();
+    i18n.setLanguage(Preferences.language());
 </script>
 </body>
 </html>

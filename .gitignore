@@ -1,3 +1,4 @@
 .idea
 
 deploy.env
+node_modules/

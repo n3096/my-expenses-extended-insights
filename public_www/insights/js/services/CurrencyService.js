@@ -1,41 +1,59 @@
-import { AppStore } from '../store/AppStore.js';
+export const DEFAULT_CURRENCY = 'EUR';
 
+/**
+ * Converts transactions into the currency the user selected.
+ *
+ * The selection is encoded as `<CURRENCY>_<MODE>`:
+ *   - `EUR_CONVERTED` converts every transaction into EUR.
+ *   - `EUR_ONLY` keeps only the transactions that were booked in EUR.
+ */
 export class CurrencyService {
-    static processTransactions(transactions, exchangeRates, targetCurrency) {
-        if (!transactions) return [];
+    static parseSelection(selection) {
+        const [currency, mode] = String(selection ?? '').split('_');
+        return {
+            currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+            nativeOnly: mode === 'ONLY'
+        };
+    }
 
-        return transactions.map(t => {
-            let displayAmount = t.amount;
-            let displayCurrency = t.currency;
+    static currencyOf(transaction) {
+        return (transaction.currency || DEFAULT_CURRENCY).toUpperCase();
+    }
 
-            if (targetCurrency === 'EUR_CONVERTED') {
-                displayCurrency = 'EUR';
-                if (t.currency === 'JPY') {
-                    const dateStr = typeof t.date === 'string' ? t.date.split('T')[0] : t.date.toISOString().split('T')[0];
-                    const rate = exchangeRates[dateStr]?.JPY;
-                    displayAmount = rate ? t.amount / rate : t.amount / 160;
-                }
-            } else if (targetCurrency === 'JPY_CONVERTED') {
-                displayCurrency = 'JPY';
-                if (t.currency === 'EUR') {
-                    const dateStr = typeof t.date === 'string' ? t.date.split('T')[0] : t.date.toISOString().split('T')[0];
-                    const rate = exchangeRates[dateStr]?.JPY;
-                    displayAmount = rate ? t.amount * rate : t.amount * 160;
-                }
-            } else if (targetCurrency === 'EUR') {
-                if (t.currency !== 'EUR') displayAmount = 0;
-            } else if (targetCurrency === 'JPY') {
-                if (t.currency !== 'JPY') displayAmount = 0;
-            }
+    /**
+     * @param getRate (isoDate, currency) => rate against the API base currency, or null
+     * @returns missingRates counts distinct day/currency rates, not the
+     *          transactions that needed them.
+     */
+    static process(transactions, selection, getRate) {
+        const { currency: target, nativeOnly } = this.parseSelection(selection);
+        const missing = new Set();
 
-            return {
-                ...t,
-                displayAmount,
-                displayCurrency,
-                displayCategory: t.displayCategory || t.mainCategory,
-                description: t.description || '',
-                account: t.account || ''
-            };
-        });
+        const rateFor = (date, currency) => {
+            const rate = getRate(date, currency);
+            if (!rate) missing.add(`${this.#dayOf(date)}|${currency}`);
+            return rate;
+        };
+
+        const processed = transactions
+            .filter(t => !nativeOnly || this.currencyOf(t) === target)
+            .map(t => {
+                const source = this.currencyOf(t);
+                const convertible = !nativeOnly && source !== target;
+                const sourceRate = convertible ? rateFor(t.date, source) : null;
+                const targetRate = convertible ? rateFor(t.date, target) : null;
+
+                return {
+                    ...t,
+                    displayAmount: sourceRate && targetRate ? (t.amount / sourceRate) * targetRate : t.amount
+                };
+            });
+
+        return { transactions: processed, missingRates: missing.size };
+    }
+
+    static #dayOf(dateStr) {
+        const date = new Date(dateStr);
+        return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     }
 }

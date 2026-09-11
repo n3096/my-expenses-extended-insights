@@ -1,65 +1,85 @@
-export const EXCHANGE_RATE_API_BASE = 'https://api.phiwi.de/exchange-rates/v1/EUR';
+import { EXCHANGE_RATE_API } from '../config.js';
+import { I18nService } from './I18nService.js';
+import { CurrencyService, DEFAULT_CURRENCY } from './CurrencyService.js';
+
+const INDICATOR_CLASSES = {
+    base: 'inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border',
+    online: 'text-green-800 dark:text-green-300 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-800',
+    offline: 'text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800'
+};
 
 export class ExchangeRateService {
     static isAvailable = false;
-    static apiKey = 'ytSbcPmtlBijIqq8w76uNVJaGNoNTVJp6PfalmLS1w2sqYplRYRyTowotYTC4BnKapsTD4MA3Xs5ipn5TD1tNS4ov31WYKBEzKqnwWtmtS9aie6CwLw0FoCpqkWn5lVt';
 
     static #buildUrl(path) {
-        const url = new URL(`${EXCHANGE_RATE_API_BASE}${path}`);
-        url.searchParams.append('key', this.apiKey);
+        const url = new URL(`${EXCHANGE_RATE_API.baseUrl}${path}`);
+        url.searchParams.set('key', EXCHANGE_RATE_API.key);
         return url.toString();
     }
 
+    static #monthPath(year, month) {
+        return `/${year}/${String(month).padStart(2, '0')}`;
+    }
+
     static async checkAvailability() {
+        const now = new Date();
         try {
-            const now = new Date();
-            const response = await fetch(this.#buildUrl(`/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`));
+            const response = await fetch(this.#buildUrl(this.#monthPath(now.getFullYear(), now.getMonth() + 1)));
             this.isAvailable = response.ok;
-            this.updateUiIndicator();
         } catch (error) {
+            console.error('Exchange rate API unreachable:', error);
             this.isAvailable = false;
-            this.updateUiIndicator();
         }
+        this.updateUiIndicator();
+        return this.isAvailable;
     }
 
     static updateUiIndicator() {
         const indicator = document.getElementById('api-status-indicator');
         if (!indicator) return;
-        indicator.className = this.isAvailable
-            ? 'inline-flex items-center px-4 py-2 border border-green-300 dark:border-green-800 shadow-sm text-sm font-medium rounded-md text-green-800 dark:text-green-300 bg-green-50 dark:bg-green-900/30'
-            : 'inline-flex items-center px-4 py-2 border border-red-300 dark:border-red-800 shadow-sm text-sm font-medium rounded-md text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30';
-        indicator.innerHTML = this.isAvailable
-            ? '<svg class="-ml-1 mr-3 h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg><span>API Online</span>'
-            : '<svg class="-ml-1 mr-3 h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg><span>API Offline</span>';
+
+        const key = this.isAvailable ? 'apiOnline' : 'apiOffline';
+        indicator.className = `${INDICATOR_CLASSES.base} ${this.isAvailable ? INDICATOR_CLASSES.online : INDICATOR_CLASSES.offline}`;
+        indicator.dataset.i18nKey = key;
+        indicator.textContent = I18nService.get(key);
     }
 
     static async fetchRatesForTransactions(transactions) {
-        if (!this.isAvailable) return { rates: [], alerts: [] };
-        const requiredMonths = [...new Set(
+        if (!this.isAvailable) return { rates: [] };
+
+        const months = [...new Set(
             transactions
-                .filter(t => t.currency !== 'EUR')
-                .map(t => t.date.substring(0, 7)) // YYYY-MM
+                .filter(t => CurrencyService.currencyOf(t) !== DEFAULT_CURRENCY)
+                .map(t => this.#monthOf(t.date))
         )];
-        if (requiredMonths.length === 0) return { rates: [], alerts: [] };
-        const endpoints = requiredMonths.map(monthStr => {
-            const [year, month] = monthStr.split('-');
-            return this.#buildUrl(`/${year}/${month}`);
-        });
-        return await this.executeRequests(endpoints);
+        if (months.length === 0) return { rates: [] };
+
+        const urls = months.map(month => this.#buildUrl(this.#monthPath(...month.split('-'))));
+        return { rates: await this.#fetchAll(urls) };
     }
 
-    static async executeRequests(endpoints) {
-        const results = [];
-        const fetchPromises = endpoints.map(async (url) => {
-            try {
-                const response = await fetch(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    results.push(data);
-                }
-            } catch (e) { console.error(`API Fetch Error: ${url}`, e); }
-        });
-        await Promise.all(fetchPromises);
-        return { rates: results, alerts: [] };
+    /** Local YYYY-MM, matching how AppStore.getRate looks rates up. */
+    static #monthOf(dateStr) {
+        const date = new Date(dateStr);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    static async #fetchAll(urls) {
+        const responses = await Promise.all(urls.map(url => this.#fetchJson(url)));
+        return responses.filter(Boolean);
+    }
+
+    static async #fetchJson(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.error(`Exchange rate request failed (${response.status}): ${url}`);
+                return null;
+            }
+            return await response.json();
+        } catch (error) {
+            console.error(`Exchange rate request failed: ${url}`, error);
+            return null;
+        }
     }
 }

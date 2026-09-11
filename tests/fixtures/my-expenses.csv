@@ -1,0 +1,13 @@
+Date,Time,Payee/Payer,Income,Expense,Currency,Category,Subcategory,Description
+15.01.24,10:00,Employer,2500.00,,EUR,Einkommen,,Gehalt Januar
+17.01.24,12:30,Supermarkt,,85.40,EUR,Lebensmittel,,Wocheneinkauf
+20.01.24,09:15,Vermieter,,900.00,EUR,Wohnen,,Miete Januar
+05.02.24,11:00,Employer,2500.00,,EUR,Einkommen,,Gehalt Februar
+07.02.24,18:45,Restaurant,,42.10,EUR,Freizeit,,Abendessen
+12.02.24,08:00,Konbini,,1200,JPY,Lebensmittel,,Onigiri
+03.03.24,10:00,Employer,2600.00,,EUR,Einkommen,,Gehalt Maerz
+11.03.24,16:20,Bahn,,59.00,EUR,Transport,,Monatskarte
+15.01.25,10:00,Employer,2700.00,,EUR,Einkommen,,Gehalt Januar
+19.01.25,13:00,Supermarkt,,95.75,EUR,Lebensmittel,,Wocheneinkauf
+22.02.25,20:00,Kino,,24.00,EUR,Freizeit,,Filmabend
+28.03.25,09:00,Vermieter,,950.00,EUR,Wohnen,,Miete Maerz
