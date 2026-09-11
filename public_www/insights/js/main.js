@@ -62,6 +62,9 @@ class App {
             UIManager.showUploadError('uploadError');
         } finally {
             UIManager.setLoading(false);
+            // Clear the input so picking the same file again still fires `change`
+            // - otherwise a corrected re-upload of a rejected file does nothing.
+            event.target.value = '';
         }
     }
 

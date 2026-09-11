@@ -109,6 +109,15 @@ export class UIManager {
     static updateViewVisibility(view) {
         document.querySelectorAll('.view-container').forEach(v => v.classList.toggle('hidden', v.id !== `${view}-view`));
         document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+
+        // Each filter control lists the views it applies to, so the bar never
+        // shows a control that would do nothing on the current view.
+        const filterRow = document.getElementById('filter-row');
+        if (filterRow) filterRow.dataset.view = view;
+
+        document.querySelectorAll('.filter-control').forEach(control => {
+            control.classList.toggle('hidden', !control.dataset.views.split(' ').includes(view));
+        });
     }
 
     static syncFilterDropdowns(state) {
@@ -132,6 +141,7 @@ export class UIManager {
         this.setSelectValue('timeframe-select', state.filters.timelineTimeframe);
         this.setSelectValue('timeline-mode-select', state.filters.timelineMode);
         this.setSelectValue('comparison-data-type-select', state.filters.comparisonType);
+        this.setSelectValue('comparison-chart-type-select', state.filters.comparisonChartType);
     }
 
     static setSelectValue(id, value) {
@@ -160,11 +170,8 @@ export class UIManager {
         document.getElementById('month-select')?.addEventListener('change', e => AppStore.update({ filters: { month: e.target.value } }));
         document.getElementById('currency-select')?.addEventListener('change', e => AppStore.update({ ui: { currencySelect: e.target.value } }));
 
-        document.querySelectorAll('.comparison-view-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const isBar = btn.id.includes('bar');
-                AppStore.update({ filters: { comparisonChartType: isBar ? 'bar' : 'pie' } });
-            });
+        document.getElementById('comparison-chart-type-select')?.addEventListener('change', e => {
+            AppStore.update({ filters: { comparisonChartType: e.target.value } });
         });
 
         document.getElementById('comparison-data-type-select')?.addEventListener('change', e => {

@@ -24,7 +24,6 @@ export class CompareManager {
         const hasData = years.length >= 1;
         const canCompare = years.length >= MIN_YEARS_FOR_DEVIATION;
 
-        this.syncChartTypeButtons(isBar);
         this.toggleElement('no-comparison-data', !hasData);
         this.toggleElement('comparison-chart-container', hasData && isBar);
         this.toggleElement('comparison-pie-charts-container', hasData && !isBar);
@@ -149,13 +148,6 @@ export class CompareManager {
                 }
             });
         });
-    }
-
-    static syncChartTypeButtons(isBar) {
-        document.getElementById('comparison-bar-btn')?.classList.toggle('view-btn', true);
-        document.getElementById('comparison-pie-btn')?.classList.toggle('view-btn', true);
-        document.getElementById('comparison-bar-btn')?.classList.toggle('active', isBar);
-        document.getElementById('comparison-pie-btn')?.classList.toggle('active', !isBar);
     }
 
     static drawChart(canvasId, config) {
