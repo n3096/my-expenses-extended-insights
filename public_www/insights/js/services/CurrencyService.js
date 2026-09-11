@@ -1,4 +1,5 @@
 export const DEFAULT_CURRENCY = 'EUR';
+const UNCATEGORIZED = 'Unkategorisiert';
 
 /**
  * Converts transactions into the currency the user selected.
@@ -24,39 +25,40 @@ export class CurrencyService {
      * @param transactions raw transactions
      * @param selection    value of the currency dropdown
      * @param getRate      (isoDate, currency) => rate against the API base currency, or null
-     * @returns {{ transactions: Array, missingRates: number }}
+     * @returns {{ transactions: Array, missingRates: number }} missingRates counts
+     *          distinct day/currency rates, not the transactions that needed them.
      */
     static process(transactions, selection, getRate) {
         const { currency: target, nativeOnly } = this.parseSelection(selection);
-        let missingRates = 0;
+        const missing = new Set();
+
+        const rateFor = (date, currency) => {
+            const rate = getRate(date, currency);
+            if (!rate) missing.add(`${this.#dayOf(date)}|${currency}`);
+            return rate;
+        };
 
         const processed = transactions
             .filter(t => !nativeOnly || this.currencyOf(t) === target)
             .map(t => {
                 const source = this.currencyOf(t);
-                let displayAmount = t.amount;
-                let rateMissing = false;
-
-                if (!nativeOnly && source !== target) {
-                    const sourceRate = getRate(t.date, source);
-                    const targetRate = getRate(t.date, target);
-                    if (sourceRate && targetRate) {
-                        displayAmount = (t.amount / sourceRate) * targetRate;
-                    } else {
-                        rateMissing = true;
-                        missingRates++;
-                    }
-                }
+                const convertible = !nativeOnly && source !== target;
+                const sourceRate = convertible ? rateFor(t.date, source) : null;
+                const targetRate = convertible ? rateFor(t.date, target) : null;
 
                 return {
                     ...t,
-                    displayAmount,
+                    displayAmount: sourceRate && targetRate ? (t.amount / sourceRate) * targetRate : t.amount,
                     displayCurrency: nativeOnly ? source : target,
-                    displayCategory: t.category || 'Unkategorisiert',
-                    rateMissing
+                    displayCategory: t.category || UNCATEGORIZED
                 };
             });
 
-        return { transactions: processed, missingRates };
+        return { transactions: processed, missingRates: missing.size };
+    }
+
+    static #dayOf(dateStr) {
+        const date = new Date(dateStr);
+        return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     }
 }
