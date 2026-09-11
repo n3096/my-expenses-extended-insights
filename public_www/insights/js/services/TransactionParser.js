@@ -83,7 +83,6 @@ export class TransactionParser {
         return { amount: Math.abs(value), type: value >= 0 ? 'income' : 'expense' };
     }
 
-    /** Hierarchical categories ("Wohnen > Miete") are grouped by their top level. */
     static #parseCategory(raw) {
         const main = raw.includes(CATEGORY_SEPARATOR) ? raw.split(CATEGORY_SEPARATOR)[0] : raw;
         return main.trim() || UNCATEGORIZED;

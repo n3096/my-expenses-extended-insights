@@ -21,11 +21,9 @@ export class CurrencyService {
     }
 
     /**
-     * @param transactions raw transactions
-     * @param selection    value of the currency dropdown
-     * @param getRate      (isoDate, currency) => rate against the API base currency, or null
-     * @returns {{ transactions: Array, missingRates: number }} missingRates counts
-     *          distinct day/currency rates, not the transactions that needed them.
+     * @param getRate (isoDate, currency) => rate against the API base currency, or null
+     * @returns missingRates counts distinct day/currency rates, not the
+     *          transactions that needed them.
      */
     static process(transactions, selection, getRate) {
         const { currency: target, nativeOnly } = this.parseSelection(selection);

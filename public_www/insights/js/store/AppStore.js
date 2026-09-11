@@ -16,7 +16,7 @@ export const AppStore = {
         exchangeRates: {},
         /** Every category in the uploaded file, sorted - independent of any filter. */
         categories: [],
-        /** Number of transactions that could not be converted for lack of a rate. */
+        /** Distinct day/currency rates that could not be loaded. */
         missingRates: 0,
         filters: {
             year: 'all',
@@ -81,8 +81,7 @@ export const AppStore = {
     getRate(dateStr, currency) {
         if (!currency || currency === DEFAULT_CURRENCY) return 1;
 
-        // Transactions carry the local calendar day the booking happened on, so
-        // the rate has to be looked up with local date parts as well.
+        // Transactions carry a local calendar day, so the lookup must use local parts.
         const date = new Date(dateStr);
         const year = date.getFullYear().toString();
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -132,7 +131,6 @@ export const AppStore = {
         this.state.fullyFilteredTransactions = FilterService.byCategory(this.state.timeFilteredTransactions, filters);
     },
 
-    /** A failing subscriber must not stop the remaining ones from rendering. */
     notify() {
         this.listeners.forEach(cb => {
             try {

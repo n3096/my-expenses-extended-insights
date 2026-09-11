@@ -44,7 +44,6 @@ export class ExchangeRateService {
         indicator.textContent = I18nService.get(key);
     }
 
-    /** Loads one month of rates for every month that contains a foreign-currency transaction. */
     static async fetchRatesForTransactions(transactions) {
         if (!this.isAvailable) return { rates: [] };
 
@@ -59,7 +58,7 @@ export class ExchangeRateService {
         return { rates: await this.#fetchAll(urls) };
     }
 
-    /** Local YYYY-MM of a transaction, matching how rates are looked up. */
+    /** Local YYYY-MM, matching how AppStore.getRate looks rates up. */
     static #monthOf(dateStr) {
         const date = new Date(dateStr);
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;

@@ -17,7 +17,6 @@ class App {
             CompareManager.init();
             this.bindEvents();
 
-            // Reports the API state up front instead of only after an upload.
             ExchangeRateService.checkAvailability();
         } catch (e) {
             console.error('Initialisation failed:', e);

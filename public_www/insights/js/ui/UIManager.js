@@ -10,7 +10,6 @@ export class UIManager {
         AppStore.subscribe(state => this.render(state));
         this.updateTheme(AppStore.state.ui.theme);
 
-        // Paint the initial state; nothing has been dispatched to the store yet.
         this.render(AppStore.state);
     }
 
@@ -27,8 +26,6 @@ export class UIManager {
             this.renderMissingRatesWarning(state);
         }
 
-        // Runs for the upload screen too - the language can be switched before
-        // a file has been picked.
         I18nService.updateDOM();
         const langSwitcher = document.getElementById('lang-switcher');
         if (langSwitcher) langSwitcher.value = state.ui.currentLang;
@@ -45,24 +42,31 @@ export class UIManager {
         const container = document.getElementById('category-list-container');
         if (!container) return;
 
-        const categories = state.categories;
-        const renderedCategories = container.dataset.categories;
-
-        // Rebuilding the list on every store update would drop the scroll
-        // position, so only the checkbox states are synced unless the set of
-        // categories itself changed.
-        if (renderedCategories !== categories.join('\u0000')) {
-            container.dataset.categories = categories.join('\u0000');
-            container.innerHTML = categories.map((cat, index) => `
-                <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
-                    <input type="checkbox" id="cat-filter-${index}" value="${escapeHtml(cat)}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600">
-                    <label for="cat-filter-${index}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${escapeHtml(cat)}</label>
-                </div>
-            `).join('');
+        // Rebuilding would drop the scroll position, so the markup is only
+        // replaced when the set of categories itself changed.
+        if (this.hasOutdatedCategoryList(container, state.categories)) {
+            this.rebuildCategoryList(container, state.categories);
         }
+        this.syncCategoryCheckboxes(container, state.filters.categories);
+    }
 
+    static hasOutdatedCategoryList(container, categories) {
+        return container.dataset.categories !== categories.join('\u0000');
+    }
+
+    static rebuildCategoryList(container, categories) {
+        container.dataset.categories = categories.join('\u0000');
+        container.innerHTML = categories.map((category, index) => `
+            <div class="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg">
+                <input type="checkbox" id="cat-filter-${index}" value="${escapeHtml(category)}" class="cat-filter-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600">
+                <label for="cat-filter-${index}" class="flex-grow text-sm cursor-pointer dark:text-slate-200">${escapeHtml(category)}</label>
+            </div>
+        `).join('');
+    }
+
+    static syncCategoryCheckboxes(container, selected) {
         container.querySelectorAll('.cat-filter-cb').forEach(cb => {
-            cb.checked = state.filters.categories.has(cb.value);
+            cb.checked = selected.has(cb.value);
         });
     }
 
@@ -110,8 +114,6 @@ export class UIManager {
         document.querySelectorAll('.view-container').forEach(v => v.classList.toggle('hidden', v.id !== `${view}-view`));
         document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
 
-        // Each filter control lists the views it applies to, so the bar never
-        // shows a control that would do nothing on the current view.
         const filterRow = document.getElementById('filter-row');
         if (filterRow) filterRow.dataset.view = view;
 

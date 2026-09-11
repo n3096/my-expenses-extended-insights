@@ -32,20 +32,17 @@
 
 <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
 
-    <!-- Header -->
     <header class="mb-12 flex justify-between items-start gap-4">
         <div class="text-center flex-grow">
             <h1 class="text-5xl font-bold text-slate-900 dark:text-white" data-i18n-key="headerTitle">Tool Dashboard</h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 text-lg" data-i18n-key="headerSubtitle">Wählen Sie ein Werkzeug aus, um zu starten.</p>
         </div>
         <div class="flex items-center gap-2 absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-8">
-            <!-- Language Switcher -->
             <select id="lang-switcher" class="block pl-3 pr-8 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm">
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
                 <option value="ja">日本語</option>
             </select>
-            <!-- Theme Toggle Button -->
             <button id="theme-toggle" class="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-slate-900">
                 <svg id="theme-icon-light" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 <svg id="theme-icon-dark" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
@@ -53,12 +50,9 @@
         </div>
     </header>
 
-    <!-- Tool Grid -->
     <main id="tool-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <!-- Tools will be inserted here by JavaScript -->
     </main>
 
-    <!-- Footer -->
     <footer class="text-center mt-16 text-slate-400 dark:text-slate-500 text-sm">
         <p id="copyright"></p>
     </footer>

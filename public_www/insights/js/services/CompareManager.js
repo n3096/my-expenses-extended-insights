@@ -102,7 +102,6 @@ export class CompareManager {
         this.renderBarChart('comparison-deviation-chart', years, topCategories, data, state);
     }
 
-    /** Spread between the selected years - the categories that changed the most. */
     static deviationOf(byYear, years) {
         const values = years.map(year => byYear[year] ?? 0);
         return Math.max(...values) - Math.min(...values);

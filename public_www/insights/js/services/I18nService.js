@@ -254,7 +254,6 @@ export class I18nService {
         return this.translations[this.currentLang()][key] ?? this.translations[DEFAULT_LANG][key] ?? key;
     }
 
-    /** Like get(), but replaces {placeholders} with the given values. */
     static format(key, params = {}) {
         return Object.entries(params).reduce(
             (text, [name, value]) => text.replaceAll(`{${name}}`, value),

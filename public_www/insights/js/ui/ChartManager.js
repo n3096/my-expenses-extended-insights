@@ -81,8 +81,6 @@ export class ChartManager {
         const periods = this.getPeriods(state.processedTransactions, timeframe);
         const netByPeriod = this.sumByPeriod(state.processedTransactions, periods, timeframe);
 
-        // The cumulative line carries everything booked before the visible window,
-        // otherwise picking a shorter timeframe would reset the running total.
         let running = mode === 'cumulative'
             ? this.netBefore(state.processedTransactions, periods[0])
             : 0;
@@ -112,7 +110,6 @@ export class ChartManager {
         });
     }
 
-    /** Net amount of everything booked before the first visible period. */
     static netBefore(transactions, period) {
         if (!period) return 0;
         const start = this.periodStart(period).getTime();
@@ -125,7 +122,6 @@ export class ChartManager {
         return period.start ?? new Date(period.year, period.month, 1);
     }
 
-    /** Net amount (income - expense) per period, keyed by period. */
     static sumByPeriod(transactions, periods, timeframe) {
         const totals = new Map();
         this.forEachInPeriod(transactions, periods, timeframe, (period, transaction) => {
@@ -135,7 +131,6 @@ export class ChartManager {
         return totals;
     }
 
-    /** Net amount per period and category, keyed by period then category. */
     static sumByPeriodAndCategory(transactions, periods, timeframe) {
         const totals = new Map(periods.map(period => [period.key, new Map()]));
         this.forEachInPeriod(transactions, periods, timeframe, (period, transaction) => {
@@ -223,11 +218,6 @@ export class ChartManager {
         if (el) el.textContent = text;
     }
 
-    /**
-     * Builds the buckets a timeline is drawn on. The range ends at the most recent
-     * transaction rather than at "today", so historic exports are not rendered as
-     * a run of empty periods.
-     */
     static getPeriods(data, timeframe) {
         const end = this.rangeEnd(data);
 

@@ -21,7 +21,6 @@ function write(key, value) {
 }
 
 export const Preferences = {
-    /** Stored choice, otherwise whatever the operating system asks for. */
     theme() {
         const stored = read(THEME_KEY);
         if (stored === 'dark' || stored === 'light') return stored;
@@ -32,7 +31,6 @@ export const Preferences = {
         write(THEME_KEY, theme);
     },
 
-    /** Stored choice, otherwise the browser language, otherwise the default. */
     language() {
         return resolveLanguage(read(LANGUAGE_KEY) ?? navigator.language);
     },
@@ -42,10 +40,7 @@ export const Preferences = {
     }
 };
 
-/**
- * Applies a theme to the document and keeps the two toggle icons in sync.
- * The visible icon is the one you would switch *to*.
- */
+/** The visible toggle icon is the theme you would switch *to*, not the active one. */
 export function applyTheme(theme) {
     const isDark = theme === 'dark';
     document.documentElement.classList.toggle('dark', isDark);
@@ -54,7 +49,6 @@ export function applyTheme(theme) {
     return theme;
 }
 
-/** Wires a toggle button; returns a function that reports the current theme. */
 export function initTheme(buttonId = 'theme-toggle', { onChange } = {}) {
     let current = applyTheme(Preferences.theme());
 

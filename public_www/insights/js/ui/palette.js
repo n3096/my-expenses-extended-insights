@@ -1,4 +1,4 @@
-/** Categorical colours shared by every chart so a category keeps its colour. */
+/** Shared by every chart so a category keeps the same colour across views. */
 export const CHART_COLORS = [
     '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899',
     '#06B6D4', '#22D3EE', '#F472B6', '#A78BFA', '#FB7185', '#34D399',

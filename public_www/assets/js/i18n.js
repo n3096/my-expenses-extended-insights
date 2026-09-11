@@ -1,4 +1,3 @@
-/** Languages every tool on this site offers, and the locale each one formats with. */
 export const LOCALES = {
     de: 'de-DE',
     en: 'en-US',
@@ -8,7 +7,6 @@ export const LOCALES = {
 export const SUPPORTED_LANGS = Object.keys(LOCALES);
 export const DEFAULT_LANG = 'de';
 
-/** Falls back to the default for anything the site does not translate. */
 export function resolveLanguage(candidate) {
     const lang = String(candidate ?? '').split('-')[0];
     return SUPPORTED_LANGS.includes(lang) ? lang : DEFAULT_LANG;
@@ -18,12 +16,7 @@ export function localeOf(lang) {
     return LOCALES[resolveLanguage(lang)];
 }
 
-/**
- * Minimal translator for the single-file tools.
- *
- * `apply()` fills every `[data-i18n-key]` element from the active pack -
- * inputs get their placeholder, everything else its text content.
- */
+/** `apply()` fills inputs' placeholder and every other element's text content. */
 export function createTranslator(translations, { onChange } = {}) {
     let lang = DEFAULT_LANG;
 
