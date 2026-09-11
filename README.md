@@ -18,6 +18,12 @@ public_www/
 ├── insights/               Insights tool (ES modules under insights/js)
 ├── statement-parser/       Bank statement parser (single page)
 └── differ/                 Transaction differ (single page)
+
+tests/                      Browser tests (dev only, never deployed)
+├── run.mjs                 Entry point behind `npm test`
+├── specs/                  One file per tool
+├── fixtures/               Sample CSV exports
+└── support/                Static server, CDN stubbing, reporting
 ```
 
 Theme and language are stored under the `theme` and `language` keys in
@@ -94,6 +100,57 @@ Any static file server works; ES modules cannot be loaded over `file://`.
 ```sh
 npx http-server public_www -p 8080
 ```
+
+## Tests and linting
+
+The site itself has no dependencies and no build step. The tooling below is for
+development only - nothing in `package.json` is shipped, and `deploy.sh` still
+copies `public_www/` and nothing else.
+
+```sh
+npm install     # dev tooling only
+npm test        # drives all four tools in headless Chromium
+npm run lint    # ESLint over modules, inline scripts and markup
+```
+
+`npm test` starts a local server, opens each page and exercises it: upload,
+filtering, the timeline across every timeframe, the year comparison, the
+transaction list, currency modes, CSV rejection, the PayPay and PDF paths, the
+differ's matching and point reconciliation, and preference inheritance between
+pages.
+
+Two details worth knowing if a test ever fails oddly:
+
+- The pages load Chart.js and pdf.js from CDNs. Tests serve the *same versions*
+  from `node_modules`, so runs are deterministic and work offline. Bumping a
+  version in a page without bumping it in `package.json` and
+  `tests/support/cdn.mjs` aborts the run with an explicit message.
+- Tailwind's real utility CSS is generated before the run, because visibility
+  in these pages is class-based. Without it every `hidden` element counts as
+  visible and assertions pass for free.
+
+`npm run lint` covers `public_www/**/*.js`, the scripts embedded in the
+single-file tools, and the markup. `no-duplicate-id` is deliberate: much of the
+wiring reaches into the DOM by element id.
+
+`.npmrc` sets `omit=optional`. `pdfjs-dist` lists `canvas` as optional for
+server-side rendering, which nothing here does, and it pulls in a vulnerable
+native toolchain. Without it the dependency tree audits clean.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs `lint` and `test` on every pull request and on
+pushes to `main`.
+
+To make them block merging, mark both as required once - the workflow file
+cannot do this itself:
+
+**Settings → Branches → Add branch ruleset** (or *Add rule*) for `main`
+
+1.  Enable **Require status checks to pass before merging**.
+2.  Add `lint` and `test` to the required checks.
+3.  Optionally enable **Require branches to be up to date before merging** so a
+    branch is re-tested against the latest `main`.
 
 ## Deployment
 
